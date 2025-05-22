@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -91,12 +91,11 @@ const sampleLogsData: Record<string, Log> = {
 
 export default function LogDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const [log, setLog] = useState<Log | null>(null);
   const [loading, setLoading] = useState(true);
   
   // 簡易的なinsights生成（実際はAIが分析する）
-  const generateInsights = useCallback((log: Log): string[] => {
+  const generateInsights = useCallback((): string[] => {
     return [
       'プロジェクトの方向性を明確にすることで作業効率が向上',
       '参考事例の分析が新しいアイデアを生み出すきっかけに',
@@ -105,7 +104,7 @@ export default function LogDetailPage() {
   }, []);
   
   // 簡易的なnextSteps生成（実際はAIが分析する）
-  const generateNextSteps = useCallback((log: Log): string[] => {
+  const generateNextSteps = useCallback((): string[] => {
     return [
       '次回のミーティングで進捗を共有',
       'フィードバックを基に改善点を洗い出す',
@@ -114,13 +113,13 @@ export default function LogDetailPage() {
   }, []);
   
   // ログデータを正規化する関数
-  const normalizeLog = useCallback((log: Log): Log => {
+  const normalizeLog = useCallback((logData: Log): Log => {
     return {
-      ...log,
-      tags: log.tags || [],
-      messages: log.messages || [],
-      insights: log.insights || generateInsights(log),
-      nextSteps: log.nextSteps || generateNextSteps(log)
+      ...logData,
+      tags: logData.tags || [],
+      messages: logData.messages || [],
+      insights: logData.insights || generateInsights(),
+      nextSteps: logData.nextSteps || generateNextSteps()
     };
   }, [generateInsights, generateNextSteps]);
   

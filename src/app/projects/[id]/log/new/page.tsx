@@ -7,7 +7,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tag, X, Brain, ArrowLeft } from 'lucide-react';
+import { Tag, X, Brain, ArrowLeft, Send } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   AlertDialog,
@@ -30,6 +30,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import Link from 'next/link';
 
 // ローカルストレージのキー
 const LS_PROJECTS_KEY = 'design-log-projects';
@@ -260,38 +261,32 @@ export default function NewLogPage() {
   const getLogStorageKey = (pid: string): string => `${LS_LOGS_PREFIX}${pid}`;
   
   return (
-    <div className="container max-w-5xl mx-auto p-6">
-      <header className="mb-8">
-        <div className="flex items-center justify-between">
-          <AlertDialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
-            <AlertDialogTrigger asChild>
-              <Button 
-                variant="ghost" 
-                className="hover:bg-transparent p-0 hover:text-primary flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                プロジェクトに戻る
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>ページを離れますか？</AlertDialogTitle>
-                <AlertDialogDescription>
-                  入力中のデータは保存されません。本当にプロジェクトページに戻りますか？
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>キャンセル</AlertDialogCancel>
-                <AlertDialogAction onClick={() => router.push(`/projects/${projectId}`)}>
-                  はい、戻ります
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
+    <div className="container mx-auto p-6">
+      <header className="mb-6 flex justify-between items-center">
+        <Link 
+          href={`/projects/${projectId}`}
+          onClick={(e) => {
+            if (messages.length > 1 || logTitle || tags.length > 0) {
+              e.preventDefault();
+              setShowExitConfirm(true);
+            }
+          }}
+          className="text-primary hover:underline mb-2 inline-flex items-center"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          プロジェクトに戻る
+        </Link>
         
-        <h1 className="text-2xl font-bold mt-4">新規ログを記録</h1>
-        <p className="text-muted-foreground">AIと対話して今日の制作活動を記録しましょう</p>
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={generateTitle}
+          title="AIが会話からタイトルを生成します"
+          className="text-muted-foreground hover:text-primary"
+        >
+          <Brain className="h-4 w-4 mr-1" />
+          タイトル生成
+        </Button>
       </header>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -368,17 +363,6 @@ export default function NewLogPage() {
                 <label htmlFor="log-title" className="block text-sm font-medium mb-1">
                   ログタイトル <span className="text-red-500">*</span>
                 </label>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  onClick={generateTitle}
-                  title="タイトルを自動生成"
-                  className="h-6 w-6"
-                  disabled={messages.length < 2}
-                >
-                  <Brain className="h-4 w-4" />
-                </Button>
               </div>
               <Input
                 id="log-title"
