@@ -90,7 +90,13 @@ export default function ProjectsPage() {
   return (
     <div className="container mx-auto p-6">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">デザインプロジェクト</h1>
+        <Link 
+          href="/"
+          className="text-primary hover:underline mb-4 inline-flex items-center"
+        >
+          ← ホームに戻る
+        </Link>
+        <h1 className="text-3xl font-bold mb-2 mt-4">デザインプロジェクト</h1>
         <p className="text-muted-foreground">AIを活用してクリエイティブな制作プロセスを記録・管理</p>
       </header>
 

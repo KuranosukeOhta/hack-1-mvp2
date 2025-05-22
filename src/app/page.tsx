@@ -29,7 +29,7 @@ export default function Home() {
               AIがデザインや制作プロセスについてのアドバイスを提供し、対話を通じてアイデアを整理します。
             </CardContent>
             <CardFooter>
-              <Link href="/chat" className="w-full">
+              <Link href="/projects/new" className="w-full">
                 <Button className="w-full">
                   チャットを始める
                 </Button>

@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tag, X, Brain, ArrowLeft, Send } from 'lucide-react';
+import { Tag, X, Brain, ArrowLeft, Send, Paperclip, Image, FileText, File } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Sheet,
@@ -20,6 +20,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import Link from 'next/link';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ローカルストレージのキー
 const LS_PROJECTS_KEY = 'design-log-projects';
@@ -36,6 +37,9 @@ export default function NewLogPage() {
   const [currentTag, setCurrentTag] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allUsedTags, setAllUsedTags] = useState<string[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropAreaRef = useRef<HTMLDivElement>(null);
   
   // AIチャットの初期化（AI SDKを使用）
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
@@ -61,6 +65,98 @@ export default function NewLogPage() {
       }
     }
   }, []);
+
+  // ドラッグ&ドロップのイベントハンドラ設定
+  useEffect(() => {
+    const dropArea = dropAreaRef.current;
+    if (!dropArea) return;
+
+    const preventDefault = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      preventDefault(e);
+      if (dropArea) dropArea.classList.add('border-primary');
+    };
+
+    const handleDragLeave = (e: DragEvent) => {
+      preventDefault(e);
+      if (dropArea) dropArea.classList.remove('border-primary');
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      preventDefault(e);
+      if (dropArea) dropArea.classList.remove('border-primary');
+      
+      if (e.dataTransfer?.files) {
+        handleFiles(Array.from(e.dataTransfer.files));
+      }
+    };
+
+    // クリップボードからの貼り付け
+    const handlePaste = (e: ClipboardEvent) => {
+      if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
+        handleFiles(Array.from(e.clipboardData.files));
+      }
+    };
+
+    dropArea.addEventListener('dragover', handleDragOver);
+    dropArea.addEventListener('dragleave', handleDragLeave);
+    dropArea.addEventListener('drop', handleDrop);
+    document.addEventListener('paste', handlePaste);
+
+    return () => {
+      dropArea.removeEventListener('dragover', handleDragOver);
+      dropArea.removeEventListener('dragleave', handleDragLeave);
+      dropArea.removeEventListener('drop', handleDrop);
+      document.removeEventListener('paste', handlePaste);
+    };
+  }, []);
+
+  // ファイル選択ダイアログを開く
+  const openFileDialog = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // ファイル選択時の処理
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      handleFiles(Array.from(e.target.files));
+    }
+  };
+
+  // ファイル処理共通関数
+  const handleFiles = (selectedFiles: File[]) => {
+    // 既存のファイルと新しいファイルを結合
+    setFiles(prevFiles => [...prevFiles, ...selectedFiles]);
+  };
+
+  // ファイルの種類に応じたアイコンを返す
+  const getFileIcon = (file: File) => {
+    if (file.type.startsWith('image/')) {
+      return <Image className="h-4 w-4" aria-label="画像ファイル" />;
+    }
+    if (file.type === 'application/pdf') {
+      return <FileText className="h-4 w-4" aria-label="PDFファイル" />;
+    }
+    return <File className="h-4 w-4" aria-label="その他のファイル" />;
+  };
+
+  // ファイルを削除
+  const removeFile = (index: number) => {
+    setFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
+  };
+
+  // ファイルサイズを読みやすい形式に変換
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+  };
   
   // タグを追加する関数
   const addTag = () => {
@@ -102,33 +198,53 @@ export default function NewLogPage() {
   };
   
   // タイトルを自動生成する関数
-  const generateTitle = () => {
+  const generateTitle = async () => {
     if (messages.length < 2) {
       alert('AIとの対話がまだ不十分です。もう少し会話を続けてください。');
       return;
     }
     
-    // ユーザーの最初のメッセージからタイトルを生成
-    const userMessages = messages.filter(m => m.role === 'user');
-    if (userMessages.length > 0) {
-      const firstUserMessage = userMessages[0].content || '';
-      if (typeof firstUserMessage === 'string') {
-        // 簡易的なタイトル生成（最初の10-15文字を使用）
-        let title = '';
-        
-        if (firstUserMessage.length <= 20) {
-          title = firstUserMessage;
-        } else {
-          const endPos = firstUserMessage.indexOf('。');
-          if (endPos > 0 && endPos < 30) {
-            title = firstUserMessage.substring(0, endPos);
+    try {
+      // API呼び出しでタイトル生成
+      const response = await fetch('/api/generate-title', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('タイトル生成に失敗しました');
+      }
+      
+      const data = await response.json();
+      setLogTitle(data.title);
+    } catch (error) {
+      console.error('タイトル生成エラー:', error);
+      
+      // エラー時はフォールバックとして簡易的なタイトル生成
+      const userMessages = messages.filter(m => m.role === 'user');
+      if (userMessages.length > 0) {
+        const firstUserMessage = userMessages[0].content || '';
+        if (typeof firstUserMessage === 'string') {
+          // 簡易的なタイトル生成（最初の10-15文字を使用）
+          let title = '';
+          
+          if (firstUserMessage.length <= 20) {
+            title = firstUserMessage;
           } else {
-            // 最初の20文字を使用
-            title = `${firstUserMessage.substring(0, Math.min(20, firstUserMessage.length))}...`;
+            const endPos = firstUserMessage.indexOf('。');
+            if (endPos > 0 && endPos < 30) {
+              title = firstUserMessage.substring(0, endPos);
+            } else {
+              // 最初の20文字を使用
+              title = `${firstUserMessage.substring(0, Math.min(20, firstUserMessage.length))}...`;
+            }
           }
+          
+          setLogTitle(title);
         }
-        
-        setLogTitle(title);
       }
     }
   };
@@ -148,6 +264,15 @@ export default function NewLogPage() {
     setIsSubmitting(true);
     
     try {
+      // ファイルの処理（実際のアプリではアップロード処理が必要）
+      // この例ではファイル名とサイズのみを保存
+      const fileInfos = files.map(file => ({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified
+      }));
+      
       // ログデータを準備
       const logId = uuidv4();
       const logData = {
@@ -156,6 +281,7 @@ export default function NewLogPage() {
         projectId,
         timestamp: new Date().toISOString(),
         tags,
+        files: fileInfos,
         messages: messages.map(m => ({
           role: m.role,
           content: typeof m.content === 'string' ? m.content : 
@@ -227,9 +353,27 @@ export default function NewLogPage() {
   // チャットフォームのサブミットハンドラをラップ
   const handleChatSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() && files.length === 0) return;
+    
+    // ファイルがある場合はメッセージに追加
+    if (files.length > 0) {
+      const fileMessage = `[添付ファイル: ${files.map(f => f.name).join(', ')}]`;
+      const combinedInput = input.trim() ? `${input}\n\n${fileMessage}` : fileMessage;
+      
+      // 入力フィールドを更新（ハックだが、useChat APIの制約上、これが最も簡単な方法）
+      const inputElement = document.querySelector('input[name="input"]') as HTMLInputElement;
+      if (inputElement) {
+        inputElement.value = combinedInput;
+        // イベントを発火させて値を更新
+        const event = new Event('input', { bubbles: true });
+        inputElement.dispatchEvent(event);
+      }
+    }
     
     await handleSubmit(e);
+    
+    // ファイルリストをクリア
+    setFiles([]);
   };
   
   // ローカルストレージのログキーを生成
@@ -245,17 +389,6 @@ export default function NewLogPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           プロジェクトに戻る
         </Link>
-        
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={generateTitle}
-          title="AIが会話からタイトルを生成します"
-          className="text-muted-foreground hover:text-primary"
-        >
-          <Brain className="h-4 w-4 mr-1" />
-          タイトル生成
-        </Button>
       </header>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -296,7 +429,45 @@ export default function NewLogPage() {
                 </div>
               )}
             </CardContent>
-            <CardFooter className="pt-4 border-t mt-auto">
+            <CardFooter className="pt-4 border-t mt-auto flex-col">
+              {/* ファイル一覧 */}
+              {files.length > 0 && (
+                <div className="w-full mb-3 p-2 border rounded-md bg-muted/20">
+                  <div className="text-xs font-medium mb-1">添付ファイル:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {files.map((file, index) => (
+                      <div key={`${file.name}-${file.lastModified}`} className="flex items-center gap-1 bg-muted/50 rounded px-2 py-1 text-xs">
+                        {getFileIcon(file)}
+                        <span className="max-w-[150px] truncate">{file.name}</span>
+                        <span className="text-muted-foreground">({formatFileSize(file.size)})</span>
+                        <button
+                          type="button"
+                          onClick={() => removeFile(index)}
+                          className="ml-1 text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* ドラッグ&ドロップエリア */}
+              <div 
+                ref={dropAreaRef}
+                className="w-full border border-dashed rounded-md p-2 mb-3 text-center text-sm text-muted-foreground transition-colors"
+              >
+                ファイルをドラッグ&ドロップするか、<button type="button" onClick={openFileDialog} className="text-primary hover:underline">ファイルを選択</button>
+                <input 
+                  ref={fileInputRef}
+                  type="file" 
+                  multiple 
+                  className="hidden" 
+                  onChange={handleFileSelect}
+                />
+              </div>
+              
               <form 
                 onSubmit={handleChatSubmit}
                 className="flex items-center gap-2 w-full"
@@ -309,9 +480,19 @@ export default function NewLogPage() {
                   disabled={isLoading || isSubmitting}
                 />
                 <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={openFileDialog}
+                  disabled={isLoading || isSubmitting}
+                  title="ファイルを添付"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
+                <Button
                   type="submit"
                   size="sm"
-                  disabled={isLoading || isSubmitting || !input.trim()}
+                  disabled={isLoading || isSubmitting || (!input.trim() && files.length === 0)}
                 >
                   <Send className="h-4 w-4 mr-2" />
                   送信
@@ -332,15 +513,35 @@ export default function NewLogPage() {
                 <label htmlFor="log-title" className="block text-sm font-medium mb-1">
                   ログタイトル <span className="text-red-500">*</span>
                 </label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={generateTitle}
+                        className="h-6 w-6 text-muted-foreground hover:text-primary"
+                      >
+                        <Brain className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>タイトル生成</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
-              <Input
-                id="log-title"
-                type="text"
-                value={logTitle}
-                onChange={(e) => setLogTitle(e.target.value)}
-                placeholder="例: デザインコンセプト決定"
-                disabled={isSubmitting}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="log-title"
+                  type="text"
+                  value={logTitle}
+                  onChange={(e) => setLogTitle(e.target.value)}
+                  placeholder="例: デザインコンセプト決定"
+                  disabled={isSubmitting}
+                  className="flex-1"
+                />
+              </div>
             </div>
             
             <div>
