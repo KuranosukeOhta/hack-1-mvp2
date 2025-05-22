@@ -342,7 +342,7 @@ export default function ProjectDetailPage() {
                   新規ログを作成
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[90%] max-h-[90vh] overflow-y-auto backdrop-blur-sm bg-background/95">
+              <DialogContent className="sm:max-w-[90%] max-h-[90vh] overflow-y-auto backdrop-blur-sm bg-background/95 border-none shadow-lg">
                 <DialogHeader>
                   <DialogTitle>新規ログを作成</DialogTitle>
                   <DialogDescription>

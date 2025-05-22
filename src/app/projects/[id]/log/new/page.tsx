@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -59,7 +59,15 @@ export default function NewLogPage() {
       const container = chatContainerRef.current;
       container.scrollTop = container.scrollHeight;
     }
-  }, [messages.length]);
+  }, []);
+  
+  // メッセージが更新されたときに自動スクロール
+  useLayoutEffect(() => {
+    if (chatContainerRef.current) {
+      const container = chatContainerRef.current;
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages]);
 
   // 初回マウント時に過去のタグを読み込む
   useEffect(() => {
@@ -364,22 +372,45 @@ export default function NewLogPage() {
     e.preventDefault();
     if (!input.trim() && files.length === 0) return;
     
-    // ファイルがある場合はメッセージに追加
-    if (files.length > 0) {
-      const fileMessage = `[添付ファイル: ${files.map(f => f.name).join(', ')}]`;
-      const combinedInput = input.trim() ? `${input}\n\n${fileMessage}` : fileMessage;
+    // ファイル情報を準備
+    const fileInfos = files.map(file => ({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified
+    }));
+    
+    try {
+      // カスタムハンドラでファイル情報を含めて送信
+      const chatResponse = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [...messages, { role: 'user', content: input }],
+          files: fileInfos
+        }),
+      });
       
-      // 入力フィールドを更新（ハックだが、useChat APIの制約上、これが最も簡単な方法）
+      if (!chatResponse.ok) {
+        throw new Error('チャットAPIでエラーが発生しました');
+      }
+      
+      // 入力フィールドをクリア
       const inputElement = document.querySelector('input[name="input"]') as HTMLInputElement;
       if (inputElement) {
-        inputElement.value = combinedInput;
+        inputElement.value = '';
         // イベントを発火させて値を更新
         const event = new Event('input', { bubbles: true });
         inputElement.dispatchEvent(event);
       }
+      
+      // 標準のハンドラを呼び出さずに処理を終了
+    } catch (error) {
+      console.error('チャット送信エラー:', error);
+      alert('メッセージの送信に失敗しました');
     }
-    
-    await handleSubmit(e);
     
     // ファイルリストをクリア
     setFiles([]);
@@ -531,24 +562,15 @@ export default function NewLogPage() {
                   disabled={isSubmitting}
                   className="flex-1"
                 />
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={generateTitle}
-                        disabled={messages.length < 2 || isSubmitting}
-                      >
-                        <Brain className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>AIでタイトルを生成</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={generateTitle}
+                  disabled={messages.length < 2 || isSubmitting}
+                >
+                  <Brain className="h-4 w-4" />
+                </Button>
               </div>
             </div>
             
