@@ -238,22 +238,22 @@ export default function LogDetailPage() {
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="dialog" className="mt-4 space-y-4">
-            {log.messages && log.messages.length > 0 ? log.messages.map((message) => (
+          <TabsContent value="dialog" className="mt-6 space-y-6">
+            {log.messages && log.messages.length > 0 ? log.messages.map((message, index) => (
               <Card 
-                key={`message-${message.role}-${Math.random()}`}
+                key={`message-${message.role}-${index}`}
                 className={`${
                   message.role === 'user' 
-                    ? 'ml-12 border-primary/10 bg-primary/5' 
-                    : 'mr-12'
+                    ? 'ml-16 border-primary/10 bg-primary/5' 
+                    : 'mr-16'
                 }`}
               >
-                <CardHeader className="py-3">
+                <CardHeader className="py-4">
                   <p className="font-medium text-sm">
                     {message.role === 'user' ? 'あなた' : 'AI'}
                   </p>
                 </CardHeader>
-                <CardContent className="py-0 text-sm">
+                <CardContent className="py-2 pb-4 text-sm">
                   <div className="whitespace-pre-wrap">
                     {message.content}
                   </div>

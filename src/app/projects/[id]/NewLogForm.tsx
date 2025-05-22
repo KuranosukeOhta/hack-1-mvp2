@@ -51,13 +51,19 @@ export default function NewLogForm({ projectId, onComplete }: NewLogFormProps) {
   
   // AIチャットの初期化（AI SDKを使用）
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    initialMessages: [
-      {
-        id: 'initial',
-        role: 'assistant',
-        content: 'こんにちは！今日のデザイン制作について教えてください。何を作業しましたか？どんな課題や発見がありましたか？',
+    api: "/api/chat",
+    body: {
+      projectContext: {
+        projectId,
+        title: projectTitle,
+        description: projectDescription,
+        category: projectCategory
       }
-    ],
+    },
+    onError: (error) => {
+      console.error("Chat API error:", error);
+      alert("チャットAPI接続時にエラーが発生しました");
+    }
   });
 
   // チャットメッセージが更新されたときに一番下にスクロール
@@ -147,16 +153,49 @@ export default function NewLogForm({ projectId, onComplete }: NewLogFormProps) {
   };
 
   // ファイル選択時の処理
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      handleFiles(Array.from(e.target.files));
-    }
-  };
-
-  // ファイル処理共通関数
   const handleFiles = (selectedFiles: File[]) => {
     // 既存のファイルと新しいファイルを結合
     setFiles(prevFiles => [...prevFiles, ...selectedFiles]);
+    
+    // ファイルを処理
+    selectedFiles.forEach(file => {
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        const result = e.target?.result;
+        if (typeof result === 'string' && result) {
+          // テキストファイルの場合は内容を追加
+          if (file.type.startsWith('text/') || file.type === 'application/json') {
+            const fileContent = `添付ファイル「${file.name}」の内容:\n${result.substring(0, 1000)}${result.length > 1000 ? '...(省略)' : ''}`;
+            
+            // 入力フィールドに追加
+            const inputElement = document.querySelector('input[name="input"]') as HTMLInputElement;
+            if (inputElement) {
+              inputElement.value = `${input}\n\n${fileContent}`;
+              const event = new Event('input', { bubbles: true });
+              inputElement.dispatchEvent(event);
+            }
+          } else {
+            // その他のファイル形式の場合は名前と種類だけを通知
+            const fileInfo = `添付ファイル: ${file.name} (${file.type}, ${formatFileSize(file.size)})`;
+            
+            // 入力フィールドに追加
+            const inputElement = document.querySelector('input[name="input"]') as HTMLInputElement;
+            if (inputElement) {
+              inputElement.value = `${input}\n\n${fileInfo}`;
+              const event = new Event('input', { bubbles: true });
+              inputElement.dispatchEvent(event);
+            }
+          }
+        }
+      };
+      
+      if (file.type.startsWith('text/') || file.type === 'application/json') {
+        reader.readAsText(file);
+      } else {
+        reader.readAsDataURL(file);
+      }
+    });
   };
 
   // ファイルの種類に応じたアイコンを返す
