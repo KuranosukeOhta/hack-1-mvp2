@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useChat } from '@ai-sdk/react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { PlusCircle, Send, Tag, X, Brain, ArrowLeft } from 'lucide-react';
+import { Tag, X, Brain, ArrowLeft } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   AlertDialog,
@@ -127,7 +125,6 @@ export default function NewLogPage() {
       const firstUserMessage = userMessages[0].content || '';
       if (typeof firstUserMessage === 'string') {
         // 簡易的なタイトル生成（最初の10-15文字を使用）
-        const words = firstUserMessage.split(' ');
         let title = '';
         
         if (firstUserMessage.length <= 20) {
@@ -224,7 +221,7 @@ export default function NewLogPage() {
   };
   
   // プロジェクトページに戻る
-  const navigateToProject = () => {
+  const handleBackToProject = () => {
     if (messages.length > 1 || logTitle || tags.length > 0) {
       setShowExitConfirm(true);
     } else {

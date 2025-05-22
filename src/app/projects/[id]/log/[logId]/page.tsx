@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,7 +94,35 @@ export default function LogDetailPage() {
   const router = useRouter();
   const [log, setLog] = useState<Log | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dialog' | 'analysis'>('dialog');
+  
+  // 簡易的なinsights生成（実際はAIが分析する）
+  const generateInsights = useCallback((log: Log): string[] => {
+    return [
+      'プロジェクトの方向性を明確にすることで作業効率が向上',
+      '参考事例の分析が新しいアイデアを生み出すきっかけに',
+      'ユーザー視点での考察が重要'
+    ];
+  }, []);
+  
+  // 簡易的なnextSteps生成（実際はAIが分析する）
+  const generateNextSteps = useCallback((log: Log): string[] => {
+    return [
+      '次回のミーティングで進捗を共有',
+      'フィードバックを基に改善点を洗い出す',
+      '実装方法の技術調査を継続'
+    ];
+  }, []);
+  
+  // ログデータを正規化する関数
+  const normalizeLog = useCallback((log: Log): Log => {
+    return {
+      ...log,
+      tags: log.tags || [],
+      messages: log.messages || [],
+      insights: log.insights || generateInsights(log),
+      nextSteps: log.nextSteps || generateNextSteps(log)
+    };
+  }, [generateInsights, generateNextSteps]);
   
   useEffect(() => {
     const loadLog = () => {
@@ -139,36 +167,7 @@ export default function LogDetailPage() {
     };
     
     loadLog();
-  }, [params.id, params.logId]);
-  
-  // 簡易的なinsights生成（実際はAIが分析する）
-  const generateInsights = (log: Log): string[] => {
-    return [
-      'プロジェクトの方向性を明確にすることで作業効率が向上',
-      '参考事例の分析が新しいアイデアを生み出すきっかけに',
-      'ユーザー視点での考察が重要'
-    ];
-  };
-  
-  // 簡易的なnextSteps生成（実際はAIが分析する）
-  const generateNextSteps = (log: Log): string[] => {
-    return [
-      '次回のミーティングで進捗を共有',
-      'フィードバックを基に改善点を洗い出す',
-      '実装方法の技術調査を継続'
-    ];
-  };
-  
-  // ログデータを正規化する関数
-  const normalizeLog = (log: Log): Log => {
-    return {
-      ...log,
-      tags: log.tags || [],
-      messages: log.messages || [],
-      insights: log.insights || generateInsights(log),
-      nextSteps: log.nextSteps || generateNextSteps(log)
-    };
-  };
+  }, [params.id, params.logId, normalizeLog]);
   
   if (loading) return (
     <div className="container mx-auto p-6">
@@ -226,13 +225,13 @@ export default function LogDetailPage() {
       <div className="mb-6">
         <Tabs defaultValue="dialog" className="w-full">
           <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="dialog" onClick={() => setActiveTab('dialog')}>
+            <TabsTrigger value="dialog">
               <div className="flex items-center">
                 <MessageCircle className="mr-2 h-4 w-4" />
                 対話記録
               </div>
             </TabsTrigger>
-            <TabsTrigger value="analysis" onClick={() => setActiveTab('analysis')}>
+            <TabsTrigger value="analysis">
               <div className="flex items-center">
                 <Brain className="mr-2 h-4 w-4" />
                 AI分析
@@ -241,9 +240,9 @@ export default function LogDetailPage() {
           </TabsList>
           
           <TabsContent value="dialog" className="mt-4 space-y-4">
-            {log.messages && log.messages.length > 0 ? log.messages.map((message, index) => (
+            {log.messages && log.messages.length > 0 ? log.messages.map((message) => (
               <Card 
-                key={`message-${message.role}-${index}`}
+                key={`message-${message.role}-${Math.random()}`}
                 className={`${
                   message.role === 'user' 
                     ? 'ml-12 border-primary/10 bg-primary/5' 
@@ -262,11 +261,7 @@ export default function LogDetailPage() {
                 </CardContent>
               </Card>
             )) : (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  メッセージがありません
-                </CardContent>
-              </Card>
+              <p className="text-center text-muted-foreground">対話記録がありません</p>
             )}
           </TabsContent>
           
