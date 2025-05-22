@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useChat } from '@ai-sdk/react';
@@ -9,12 +9,34 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { PlusCircle, Send, Tag, X } from 'lucide-react';
+import { PlusCircle, Send, Tag, X, Brain, ArrowLeft } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 // ローカルストレージのキー
 const LS_PROJECTS_KEY = 'design-log-projects';
 const LS_LOGS_PREFIX = 'design-log-logs-';
+const LS_ALL_TAGS_KEY = 'design-log-all-tags';
 
 export default function NewLogPage() {
   const params = useParams();
@@ -25,6 +47,8 @@ export default function NewLogPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [currentTag, setCurrentTag] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [allUsedTags, setAllUsedTags] = useState<string[]>([]);
   
   // AIチャットの初期化（AI SDKを使用）
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
@@ -36,12 +60,44 @@ export default function NewLogPage() {
       }
     ],
   });
+
+  // 初回マウント時に過去のタグを読み込む
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const storedTags = localStorage.getItem(LS_ALL_TAGS_KEY);
+        if (storedTags) {
+          setAllUsedTags(JSON.parse(storedTags));
+        }
+      } catch (error) {
+        console.error('タグの読み込みに失敗しました:', error);
+      }
+    }
+  }, []);
   
   // タグを追加する関数
   const addTag = () => {
     if (currentTag.trim() && !tags.includes(currentTag.trim())) {
       setTags([...tags, currentTag.trim()]);
       setCurrentTag('');
+      
+      // 全体のタグリストに追加
+      if (!allUsedTags.includes(currentTag.trim())) {
+        const newAllTags = [...allUsedTags, currentTag.trim()];
+        setAllUsedTags(newAllTags);
+        
+        // ローカルストレージに保存
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(LS_ALL_TAGS_KEY, JSON.stringify(newAllTags));
+        }
+      }
+    }
+  };
+  
+  // 既存タグを選択する
+  const selectExistingTag = (tag: string) => {
+    if (!tags.includes(tag)) {
+      setTags([...tags, tag]);
     }
   };
   
@@ -55,6 +111,39 @@ export default function NewLogPage() {
     if (e.key === 'Enter') {
       e.preventDefault();
       addTag();
+    }
+  };
+  
+  // タイトルを自動生成する関数
+  const generateTitle = () => {
+    if (messages.length < 2) {
+      alert('AIとの対話がまだ不十分です。もう少し会話を続けてください。');
+      return;
+    }
+    
+    // ユーザーの最初のメッセージからタイトルを生成
+    const userMessages = messages.filter(m => m.role === 'user');
+    if (userMessages.length > 0) {
+      const firstUserMessage = userMessages[0].content || '';
+      if (typeof firstUserMessage === 'string') {
+        // 簡易的なタイトル生成（最初の10-15文字を使用）
+        const words = firstUserMessage.split(' ');
+        let title = '';
+        
+        if (firstUserMessage.length <= 20) {
+          title = firstUserMessage;
+        } else {
+          const endPos = firstUserMessage.indexOf('。');
+          if (endPos > 0 && endPos < 30) {
+            title = firstUserMessage.substring(0, endPos);
+          } else {
+            // 最初の20文字を使用
+            title = `${firstUserMessage.substring(0, Math.min(20, firstUserMessage.length))}...`;
+          }
+        }
+        
+        setLogTitle(title);
+      }
     }
   };
   
@@ -111,9 +200,18 @@ export default function NewLogPage() {
         const logs = storedLogs ? JSON.parse(storedLogs) : [];
         logs.push(logData);
         localStorage.setItem(logsKey, JSON.stringify(logs));
+        
+        // 使用したタグをグローバルタグリストに追加
+        const allTags = [...allUsedTags];
+        for (const tag of tags) {
+          if (!allTags.includes(tag)) {
+            allTags.push(tag);
+          }
+        }
+        localStorage.setItem(LS_ALL_TAGS_KEY, JSON.stringify(allTags));
       }
       
-      // 保存完了後、プロジェクト詳細ページへリダイレクト
+      // プロジェクト詳細ページへリダイレクト
       setTimeout(() => {
         router.push(`/projects/${projectId}`);
       }, 500);
@@ -122,6 +220,15 @@ export default function NewLogPage() {
       console.error('ログの保存に失敗しました:', error);
       alert('ログの保存に失敗しました');
       setIsSubmitting(false);
+    }
+  };
+  
+  // プロジェクトページに戻る
+  const navigateToProject = () => {
+    if (messages.length > 1 || logTitle || tags.length > 0) {
+      setShowExitConfirm(true);
+    } else {
+      router.push(`/projects/${projectId}`);
     }
   };
   
@@ -158,12 +265,34 @@ export default function NewLogPage() {
   return (
     <div className="container max-w-5xl mx-auto p-6">
       <header className="mb-8">
-        <Link 
-          href={`/projects/${projectId}`}
-          className="text-primary hover:underline mb-2 inline-flex items-center"
-        >
-          ← プロジェクトに戻る
-        </Link>
+        <div className="flex items-center justify-between">
+          <AlertDialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
+            <AlertDialogTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="hover:bg-transparent p-0 hover:text-primary flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                プロジェクトに戻る
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>ページを離れますか？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  入力中のデータは保存されません。本当にプロジェクトページに戻りますか？
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                <AlertDialogAction onClick={() => router.push(`/projects/${projectId}`)}>
+                  はい、戻ります
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+        
         <h1 className="text-2xl font-bold mt-4">新規ログを記録</h1>
         <p className="text-muted-foreground">AIと対話して今日の制作活動を記録しましょう</p>
       </header>
@@ -238,9 +367,22 @@ export default function NewLogPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <label htmlFor="log-title" className="block text-sm font-medium mb-1">
-                ログタイトル <span className="text-red-500">*</span>
-              </label>
+              <div className="flex justify-between items-center">
+                <label htmlFor="log-title" className="block text-sm font-medium mb-1">
+                  ログタイトル <span className="text-red-500">*</span>
+                </label>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={generateTitle}
+                  title="タイトルを自動生成"
+                  className="h-6 w-6"
+                  disabled={messages.length < 2}
+                >
+                  <Brain className="h-4 w-4" />
+                </Button>
+              </div>
               <Input
                 id="log-title"
                 type="text"
@@ -274,6 +416,44 @@ export default function NewLogPage() {
                 >
                   <Tag className="h-4 w-4" />
                 </Button>
+                
+                {allUsedTags.length > 0 && (
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button variant="ghost" size="sm" className="px-2">
+                        <Tag className="h-3.5 w-3.5 mr-1" />
+                        過去のタグ
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                      <SheetHeader>
+                        <SheetTitle>過去に使用したタグ</SheetTitle>
+                        <SheetDescription>
+                          クリックして追加します
+                        </SheetDescription>
+                      </SheetHeader>
+                      <div className="flex flex-wrap gap-2 mt-6">
+                        {allUsedTags.map(tag => (
+                          <Badge 
+                            key={tag}
+                            variant="outline"
+                            className="cursor-pointer hover:bg-primary/10"
+                            onClick={() => {
+                              selectExistingTag(tag);
+                            }}
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                      <SheetFooter className="mt-6">
+                        <SheetClose asChild>
+                          <Button variant="outline">閉じる</Button>
+                        </SheetClose>
+                      </SheetFooter>
+                    </SheetContent>
+                  </Sheet>
+                )}
               </div>
               
               {tags.length > 0 && (
