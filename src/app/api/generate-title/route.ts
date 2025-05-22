@@ -1,5 +1,5 @@
 import { openai } from '@ai-sdk/openai';
-import { textStream } from 'ai';
+import { generateText } from 'ai';
 
 // サーバーの最大実行時間を30秒に設定
 export const maxDuration = 30;
@@ -17,9 +17,9 @@ export async function POST(req: Request) {
       デザインプロセスや作業内容が分かるタイトルが望ましいです。
     `;
     
-    // AI SDKを使用してタイトル生成
-    const response = await textStream({
-      model: openai('gpt-4o'),
+    // 非ストリーミング方式でテキスト生成
+    const { text: title } = await generateText({
+      model: openai('gpt-4o-mini'),
       system: systemPrompt,
       messages: [
         ...messages,
@@ -28,9 +28,6 @@ export async function POST(req: Request) {
       temperature: 0.7,
       maxTokens: 50,
     });
-    
-    // テキストを取得
-    const title = await response.text();
     
     // レスポンスを返す
     return Response.json({ title: title.trim() || '新規ログ' });
@@ -41,4 +38,4 @@ export async function POST(req: Request) {
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
-} 
+}
