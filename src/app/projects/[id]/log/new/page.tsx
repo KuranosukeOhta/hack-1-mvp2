@@ -10,17 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Tag, X, Brain, ArrowLeft, Send } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
   Sheet,
   SheetClose,
   SheetContent,
@@ -46,7 +35,6 @@ export default function NewLogPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [currentTag, setCurrentTag] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [allUsedTags, setAllUsedTags] = useState<string[]>([]);
   
   // AIチャットの初期化（AI SDKを使用）
@@ -221,21 +209,8 @@ export default function NewLogPage() {
     }
   };
   
-  // プロジェクトページに戻る
-  const handleBackToProject = () => {
-    if (messages.length > 1 || logTitle || tags.length > 0) {
-      setShowExitConfirm(true);
-    } else {
-      router.push(`/projects/${projectId}`);
-    }
-  };
-  
   // 簡易的なサマリー生成（実際はもっと高度な処理が必要）
-  const generateSummary = (msgs: Array<{ 
-    role: string; 
-    content: string | { text?: string }; 
-    parts?: Array<{ type: string; text: string }> 
-  }>) => {
+  const generateSummary = (msgs: { role: string; content: string | unknown }[]) => {
     // ユーザーの最初のメッセージから50文字程度を抽出
     const userMessages = msgs.filter(m => m.role === 'user');
     if (userMessages.length > 0) {
@@ -265,12 +240,6 @@ export default function NewLogPage() {
       <header className="mb-6 flex justify-between items-center">
         <Link 
           href={`/projects/${projectId}`}
-          onClick={(e) => {
-            if (messages.length > 1 || logTitle || tags.length > 0) {
-              e.preventDefault();
-              setShowExitConfirm(true);
-            }
-          }}
           className="text-primary hover:underline mb-2 inline-flex items-center"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />

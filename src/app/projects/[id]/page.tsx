@@ -219,9 +219,9 @@ export default function ProjectDetailPage() {
   const getStatusBadge = (status: Project['status']) => {
     switch (status) {
       case 'completed':
-        return <Badge variant="success">完了</Badge>;
+        return <Badge variant="default" className="bg-green-500">完了</Badge>;
       case 'in-progress':
-        return <Badge variant="warning">進行中</Badge>;
+        return <Badge variant="default" className="bg-yellow-500">進行中</Badge>;
       case 'review':
         return <Badge variant="secondary">レビュー中</Badge>;
       default:

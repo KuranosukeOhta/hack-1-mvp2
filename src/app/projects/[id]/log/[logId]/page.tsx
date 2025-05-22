@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -287,10 +287,10 @@ export default function LogDetailPage() {
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2">
-                    {log.insights.map((insight, index) => (
+                    {log.insights.map((insight, i) => (
                       <li key={`insight-${insight.substring(0, 20)}`} className="flex items-start">
                         <Badge variant="outline" className="mr-2 mt-0.5 h-5 w-5 flex items-center justify-center p-0 text-primary">
-                          {index + 1}
+                          {i + 1}
                         </Badge>
                         <span>{insight}</span>
                       </li>
@@ -310,7 +310,7 @@ export default function LogDetailPage() {
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2">
-                    {log.nextSteps.map((step, index) => (
+                    {log.nextSteps.map((step) => (
                       <li key={`step-${step.substring(0, 20)}`} className="flex items-start">
                         <div className="mr-2 text-green-500">→</div>
                         <span>{step}</span>
