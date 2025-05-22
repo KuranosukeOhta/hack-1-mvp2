@@ -241,26 +241,26 @@ export default function NewLogPage() {
       console.error('タイトル生成エラー:', error);
       
       // エラー時はフォールバックとして簡易的なタイトル生成
-      const userMessages = messages.filter(m => m.role === 'user');
-      if (userMessages.length > 0) {
-        const firstUserMessage = userMessages[0].content || '';
-        if (typeof firstUserMessage === 'string') {
-          // 簡易的なタイトル生成（最初の10-15文字を使用）
-          let title = '';
-          
-          if (firstUserMessage.length <= 20) {
-            title = firstUserMessage;
+    const userMessages = messages.filter(m => m.role === 'user');
+    if (userMessages.length > 0) {
+      const firstUserMessage = userMessages[0].content || '';
+      if (typeof firstUserMessage === 'string') {
+        // 簡易的なタイトル生成（最初の10-15文字を使用）
+        let title = '';
+        
+        if (firstUserMessage.length <= 20) {
+          title = firstUserMessage;
+        } else {
+          const endPos = firstUserMessage.indexOf('。');
+          if (endPos > 0 && endPos < 30) {
+            title = firstUserMessage.substring(0, endPos);
           } else {
-            const endPos = firstUserMessage.indexOf('。');
-            if (endPos > 0 && endPos < 30) {
-              title = firstUserMessage.substring(0, endPos);
-            } else {
-              // 最初の20文字を使用
-              title = `${firstUserMessage.substring(0, Math.min(20, firstUserMessage.length))}...`;
-            }
+            // 最初の20文字を使用
+            title = `${firstUserMessage.substring(0, Math.min(20, firstUserMessage.length))}...`;
           }
-          
-          setLogTitle(title);
+        }
+        
+        setLogTitle(title);
         }
       }
     }
@@ -372,45 +372,23 @@ export default function NewLogPage() {
     e.preventDefault();
     if (!input.trim() && files.length === 0) return;
     
-    // ファイル情報を準備
-    const fileInfos = files.map(file => ({
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      lastModified: file.lastModified
-    }));
-    
-    try {
-      // カスタムハンドラでファイル情報を含めて送信
-      const chatResponse = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [...messages, { role: 'user', content: input }],
-          files: fileInfos
-        }),
-      });
+    // ファイルがある場合はメッセージに追加
+    if (files.length > 0) {
+      const fileMessage = `[添付ファイル: ${files.map(f => f.name).join(', ')}]`;
+      const combinedInput = input.trim() ? `${input}\n\n${fileMessage}` : fileMessage;
       
-      if (!chatResponse.ok) {
-        throw new Error('チャットAPIでエラーが発生しました');
-      }
-      
-      // 入力フィールドをクリア
+      // 入力フィールドを更新
       const inputElement = document.querySelector('input[name="input"]') as HTMLInputElement;
       if (inputElement) {
-        inputElement.value = '';
+        inputElement.value = combinedInput;
         // イベントを発火させて値を更新
         const event = new Event('input', { bubbles: true });
         inputElement.dispatchEvent(event);
       }
-      
-      // 標準のハンドラを呼び出さずに処理を終了
-    } catch (error) {
-      console.error('チャット送信エラー:', error);
-      alert('メッセージの送信に失敗しました');
     }
+    
+    // 標準のハンドラを呼び出し
+    await handleSubmit(e);
     
     // ファイルリストをクリア
     setFiles([]);
@@ -549,17 +527,17 @@ export default function NewLogPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <label htmlFor="log-title" className="block text-sm font-medium mb-1">
-                ログタイトル <span className="text-red-500">*</span>
-              </label>
+                <label htmlFor="log-title" className="block text-sm font-medium mb-1">
+                  ログタイトル <span className="text-red-500">*</span>
+                </label>
               <div className="flex items-center gap-2">
-                <Input
-                  id="log-title"
-                  type="text"
-                  value={logTitle}
-                  onChange={(e) => setLogTitle(e.target.value)}
-                  placeholder="例: デザインコンセプト決定"
-                  disabled={isSubmitting}
+              <Input
+                id="log-title"
+                type="text"
+                value={logTitle}
+                onChange={(e) => setLogTitle(e.target.value)}
+                placeholder="例: デザインコンセプト決定"
+                disabled={isSubmitting}
                   className="flex-1"
                 />
                 <Button

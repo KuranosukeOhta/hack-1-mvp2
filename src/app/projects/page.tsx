@@ -25,33 +25,33 @@ const LS_PROJECTS_KEY = 'design-log-projects';
 const sampleProjects: Project[] = [
   {
     id: '1',
-    title: 'インタラクティブなポートフォリオサイト',
-    description: 'デザイン学科の課題。個性を表現するポートフォリオサイトの制作。',
-    category: 'Webデザイン',
-    thumbnail: '/thumbnails/portfolio.jpg',
-    createdAt: '2023-10-15',
-    updatedAt: '2023-10-28',
-    logsCount: 8
+    title: '私の日常を切り取る - フォトグラフィー作品集',
+    description: '大学の課題で制作した写真集。日常の中の美しさや一瞬の表情を切り取ることをテーマに。',
+    category: 'フォトグラフィー',
+    thumbnail: '/thumbnails/photography.jpg',
+    createdAt: '2024-03-15',
+    updatedAt: '2024-03-28',
+    logsCount: 12
   },
   {
     id: '2',
-    title: '学園祭ポスターデザイン',
-    description: '学園祭の広報用ポスター。テーマは「つながる未来」。',
-    category: 'グラフィックデザイン',
-    thumbnail: '/thumbnails/festival-poster.jpg',
-    createdAt: '2023-09-01',
-    updatedAt: '2023-09-20',
-    logsCount: 6
+    title: '手書き文字の可能性を探る - タイポグラフィ実験',
+    description: '手書き文字とデジタルフォントの融合をテーマにした実験的なタイポグラフィ作品。',
+    category: 'タイポグラフィ',
+    thumbnail: '/thumbnails/typography.jpg',
+    createdAt: '2024-02-20',
+    updatedAt: '2024-03-10',
+    logsCount: 8
   },
   {
     id: '3',
-    title: '環境問題啓発アプリUI',
-    description: '環境サークル向けのモバイルアプリUIデザイン。持続可能性をテーマに。',
-    category: 'UIデザイン',
-    thumbnail: '/thumbnails/eco-app.jpg',
-    createdAt: '2023-08-10',
-    updatedAt: '2023-11-05',
-    logsCount: 12
+    title: '私の部屋の色 - カラーパレット制作',
+    description: '自分の部屋からインスピレーションを得た、オリジナルカラーパレットの制作過程。',
+    category: 'カラーデザイン',
+    thumbnail: '/thumbnails/color-palette.jpg',
+    createdAt: '2024-01-15',
+    updatedAt: '2024-02-05',
+    logsCount: 6
   }
 ];
 

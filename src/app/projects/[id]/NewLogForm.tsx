@@ -379,45 +379,23 @@ export default function NewLogForm({ projectId, onComplete }: NewLogFormProps) {
     e.preventDefault();
     if (!input.trim() && files.length === 0) return;
     
-    // ファイル情報を準備
-    const fileInfos = files.map(file => ({
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      lastModified: file.lastModified
-    }));
-    
-    try {
-      // カスタムハンドラでファイル情報を含めて送信
-      const chatResponse = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [...messages, { role: 'user', content: input }],
-          files: fileInfos
-        }),
-      });
+    // ファイルがある場合はメッセージに追加
+    if (files.length > 0) {
+      const fileMessage = `[添付ファイル: ${files.map(f => f.name).join(', ')}]`;
+      const combinedInput = input.trim() ? `${input}\n\n${fileMessage}` : fileMessage;
       
-      if (!chatResponse.ok) {
-        throw new Error('チャットAPIでエラーが発生しました');
-      }
-      
-      // 入力フィールドをクリア
+      // 入力フィールドを更新
       const inputElement = document.querySelector('input[name="input"]') as HTMLInputElement;
       if (inputElement) {
-        inputElement.value = '';
+        inputElement.value = combinedInput;
         // イベントを発火させて値を更新
         const event = new Event('input', { bubbles: true });
         inputElement.dispatchEvent(event);
       }
-      
-      // 標準のハンドラを呼び出さずに処理を終了
-    } catch (error) {
-      console.error('チャット送信エラー:', error);
-      alert('メッセージの送信に失敗しました');
     }
+    
+    // 標準のハンドラを呼び出し
+    await handleSubmit(e);
     
     // ファイルリストをクリア
     setFiles([]);
