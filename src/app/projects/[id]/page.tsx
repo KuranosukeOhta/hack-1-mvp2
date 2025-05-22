@@ -11,6 +11,15 @@ import {
   PlusCircle, BarChart2Icon, FileTextIcon, 
   BrainIcon, ActivityIcon 
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import NewLogForm from './NewLogForm';
 
 interface Log {
   id: string;
@@ -136,6 +145,7 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isNewLogDialogOpen, setIsNewLogDialogOpen] = useState(false);
   
   useEffect(() => {
     const loadProject = () => {
@@ -250,166 +260,153 @@ export default function ProjectDetailPage() {
   
   return (
     <div className="container mx-auto p-6">
-      <header className="mb-8">
+      <header className="mb-6">
         <Link 
           href="/projects"
-          className="text-primary hover:underline mb-4 inline-flex items-center"
+          className="text-primary hover:underline mb-2 inline-flex items-center"
         >
           ← プロジェクト一覧に戻る
         </Link>
         
-        <Card className="mt-4">
-          <CardHeader className="pb-2">
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <Badge variant="outline">{project.category}</Badge>
-              {getStatusBadge(project.status)}
-            </div>
-            <CardTitle className="text-2xl">{project.title}</CardTitle>
-            <p className="text-muted-foreground">{project.description}</p>
-          </CardHeader>
-          
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              {project.members && (
-                <div className="flex items-start gap-2">
-                  <UsersIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="font-medium text-muted-foreground">メンバー</p>
-                    <p>{project.members.join(', ')}</p>
-                  </div>
-                </div>
-              )}
-              
-              {project.deadline && (
-                <div className="flex items-start gap-2">
-                  <CalendarIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="font-medium text-muted-foreground">提出期限</p>
-                    <p>{project.deadline}</p>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex items-start gap-2">
-                <FolderIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="font-medium text-muted-foreground">作成日</p>
-                  <p>{project.createdAt}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-2">
-                <ClockIcon className="h-4 w-4 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="font-medium text-muted-foreground">最終更新</p>
-                  <p>{project.updatedAt}</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {loading ? (
+          <div className="h-8 bg-muted rounded animate-pulse mt-2" />
+        ) : project ? (
+          <>
+            <h1 className="text-3xl font-bold mt-4">{project.title}</h1>
+            <p className="text-muted-foreground mt-1 max-w-2xl">{project.description}</p>
+          </>
+        ) : (
+          <h1 className="text-3xl font-bold mt-4">プロジェクトが見つかりません</h1>
+        )}
       </header>
       
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">制作ログ</h2>
-          <Link href={`/projects/${project.id}/log/new`}>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              新規ログを記録
-            </Button>
-          </Link>
+      {loading ? (
+        <div className="grid gap-6">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-24 bg-muted rounded animate-pulse" />
+          ))}
         </div>
-        
-        <div className="space-y-4">
-          {project.logs && project.logs.length > 0 ? (
-            project.logs.map(log => (
-              <Link
-                key={log.id}
-                href={`/projects/${project.id}/log/${log.id}`}
-              >
-                <Card className="transition-all hover:shadow-md">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between">
-                      <CardTitle className="text-lg">{log.title}</CardTitle>
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(log.timestamp).toLocaleDateString('ja-JP')}
-                      </span>
+      ) : project ? (
+        <>
+          <div className="flex flex-wrap gap-4 mb-8">
+            {/* プロジェクト情報カード */}
+            <Card className="flex-1 min-w-[300px]">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">プロジェクト情報</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-primary/5 text-primary">
+                      {project.category}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">作成日:</span>
+                    <span>{project.createdAt}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <ClockIcon className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">更新日:</span>
+                    <span>{project.updatedAt}</span>
+                  </div>
+                  {project.deadline && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">期限:</span>
+                      <span>{project.deadline}</span>
                     </div>
-                  </CardHeader>
-                  
-                  <CardContent>
-                    {log.summary && (
-                      <p className="text-muted-foreground line-clamp-2">{log.summary}</p>
-                    )}
-                  </CardContent>
-                  
-                  {log.tags && log.tags.length > 0 && (
-                    <CardFooter className="pt-0 flex-wrap gap-1">
-                      {log.tags.map(tag => (
-                        <Badge key={`${log.id}-${tag}`} variant="outline">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </CardFooter>
                   )}
-                </Card>
-              </Link>
-            ))
-          ) : (
-            <Card className="bg-muted/50">
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <p className="text-muted-foreground text-center mb-4">
-                  ログがまだ記録されていません
-                </p>
-                <Link href={`/projects/${project.id}/log/new`}>
-                  <Button variant="outline">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    新規ログを記録
-                  </Button>
-                </Link>
+                  {project.members && project.members.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <UsersIcon className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">メンバー:</span>
+                      <span>{project.members.join(', ')}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(project.status)}
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          )}
+          </div>
+          
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">ログ一覧</h2>
+            <Dialog open={isNewLogDialogOpen} onOpenChange={setIsNewLogDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  新規ログを作成
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[90%] max-h-[90vh] overflow-y-auto backdrop-blur-sm bg-background/95">
+                <DialogHeader>
+                  <DialogTitle>新規ログを作成</DialogTitle>
+                  <DialogDescription>
+                    AIとの対話を通じてデザイン制作プロセスを記録します
+                  </DialogDescription>
+                </DialogHeader>
+                <NewLogForm projectId={project.id} onComplete={() => setIsNewLogDialogOpen(false)} />
+              </DialogContent>
+            </Dialog>
+          </div>
+          
+          {/* ログ一覧 */}
+          <div className="space-y-4">
+            {project.logs && project.logs.length > 0 ? (
+              project.logs
+                .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                .map(log => (
+                  <Link key={log.id} href={`/projects/${project.id}/log/${log.id}`}>
+                    <Card className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-medium">{log.title}</h3>
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                              {log.summary || '概要なし'}
+                            </p>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {log.tags?.map(tag => (
+                                <Badge key={tag} variant="secondary" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(log.timestamp).toLocaleDateString('ja-JP')}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))
+            ) : (
+              <div className="text-center py-12 border rounded-lg bg-muted/20">
+                <FileTextIcon className="h-12 w-12 mx-auto text-muted-foreground/60" />
+                <h3 className="mt-4 text-lg font-medium">ログがありません</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  「新規ログを作成」ボタンからデザイン制作プロセスを記録しましょう
+                </p>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="text-center py-12">
+          <h2 className="text-xl font-semibold">プロジェクトが見つかりません</h2>
+          <p className="mt-2 text-muted-foreground">
+            指定されたIDのプロジェクトは存在しないか、削除された可能性があります。
+          </p>
+          <Link href="/projects" className="mt-4 inline-block">
+            <Button variant="outline">プロジェクト一覧に戻る</Button>
+          </Link>
         </div>
-      </div>
-      
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">成果物を生成</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Button variant="outline" className="h-auto py-6 flex flex-col items-start justify-start" type="button">
-            <div className="flex items-center mb-2 text-primary">
-              <BarChart2Icon className="h-5 w-5 mr-2" />
-              <span className="font-medium">制作フローチャート</span>
-            </div>
-            <p className="text-sm text-muted-foreground text-left">全ログから制作プロセスをフローチャートとして可視化</p>
-          </Button>
-          
-          <Button variant="outline" className="h-auto py-6 flex flex-col items-start justify-start" type="button">
-            <div className="flex items-center mb-2 text-primary">
-              <FileTextIcon className="h-5 w-5 mr-2" />
-              <span className="font-medium">制作報告書</span>
-            </div>
-            <p className="text-sm text-muted-foreground text-left">プロジェクトの進捗と成果をまとめた報告書を生成</p>
-          </Button>
-          
-          <Button variant="outline" className="h-auto py-6 flex flex-col items-start justify-start" type="button">
-            <div className="flex items-center mb-2 text-primary">
-              <BrainIcon className="h-5 w-5 mr-2" />
-              <span className="font-medium">主要な学び・発見</span>
-            </div>
-            <p className="text-sm text-muted-foreground text-left">プロジェクトから得られた重要な気づきや学びを抽出</p>
-          </Button>
-          
-          <Button variant="outline" className="h-auto py-6 flex flex-col items-start justify-start" type="button">
-            <div className="flex items-center mb-2 text-primary">
-              <ActivityIcon className="h-5 w-5 mr-2" />
-              <span className="font-medium">タイムライン</span>
-            </div>
-            <p className="text-sm text-muted-foreground text-left">制作プロセスを時系列で視覚化</p>
-          </Button>
-        </div>
-      </div>
+      )}
     </div>
   );
 } 

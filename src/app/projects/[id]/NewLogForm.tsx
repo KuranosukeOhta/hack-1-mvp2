@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useChat } from '@ai-sdk/react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tag, X, Brain, ArrowLeft, Send, Paperclip, Image, FileText, File } from 'lucide-react';
+import { Tag, X, Brain, Send, Paperclip, Image, FileText, File } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Sheet,
@@ -19,18 +19,25 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import Link from 'next/link';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ローカルストレージのキー
 const LS_PROJECTS_KEY = 'design-log-projects';
 const LS_LOGS_PREFIX = 'design-log-logs-';
 const LS_ALL_TAGS_KEY = 'design-log-all-tags';
 
-export default function NewLogPage() {
-  const params = useParams();
+interface NewLogFormProps {
+  projectId: string;
+  onComplete: () => void;
+}
+
+export default function NewLogForm({ projectId, onComplete }: NewLogFormProps) {
   const router = useRouter();
-  const projectId = params.id as string;
   
   const [logTitle, setLogTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -332,11 +339,11 @@ export default function NewLogPage() {
         localStorage.setItem(LS_ALL_TAGS_KEY, JSON.stringify(allTags));
       }
       
-      // プロジェクト詳細ページへリダイレクト
-      setTimeout(() => {
-        router.push(`/projects/${projectId}`);
-      }, 500);
+      // 完了コールバックを呼び出し
+      onComplete();
       
+      // プロジェクト詳細ページを更新
+      router.refresh();
     } catch (error) {
       console.error('ログの保存に失敗しました:', error);
       alert('ログの保存に失敗しました');
@@ -389,270 +396,258 @@ export default function NewLogPage() {
   const getLogStorageKey = (pid: string): string => `${LS_LOGS_PREFIX}${pid}`;
   
   return (
-    <div className="container mx-auto p-6">
-      <header className="mb-6 flex justify-between items-center">
-        <Link 
-          href={`/projects/${projectId}`}
-          className="text-primary hover:underline mb-2 inline-flex items-center"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          プロジェクトに戻る
-        </Link>
-      </header>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          {/* チャット履歴表示エリア */}
-          <Card className="h-[500px] flex flex-col">
-            <CardHeader className="pb-2">
-              <h2 className="font-medium">対話履歴</h2>
-            </CardHeader>
-            <CardContent ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-4 pb-0">
-              {messages.map(message => (
-                <div 
-                  key={message.id}
-                  className={`p-3 rounded-lg ${
-                    message.role === 'user' 
-                      ? 'bg-primary/10 ml-12' 
-                      : 'bg-muted/50 mr-12 border'
-                  }`}
-                >
-                  <div className="font-medium mb-1 text-sm">
-                    {message.role === 'user' ? 'あなた' : 'AI'}
-                  </div>
-                  <div className="whitespace-pre-wrap text-sm">
-                    {typeof message.content === 'string' 
-                      ? message.content
-                      : message.parts?.map((part, i) => 
-                          part.type === 'text' ? <span key={`${message.id}-part-${i}`}>{part.text}</span> : null
-                        )
-                    }
-                  </div>
-                </div>
-              ))}
-              
-              {isLoading && (
-                <div className="p-3 rounded-lg bg-muted/50 mr-12 border">
-                  <div className="font-medium mb-1 text-sm">AI</div>
-                  <div className="animate-pulse text-sm">入力中...</div>
-                </div>
-              )}
-            </CardContent>
-            <CardFooter className="pt-4 border-t mt-auto flex-col">
-              {/* ファイル一覧 */}
-              {files.length > 0 && (
-                <div className="w-full mb-3 p-2 border rounded-md bg-muted/20">
-                  <div className="text-xs font-medium mb-1">添付ファイル:</div>
-                  <div className="flex flex-wrap gap-2">
-                    {files.map((file, index) => (
-                      <div key={`${file.name}-${file.lastModified}`} className="flex items-center gap-1 bg-muted/50 rounded px-2 py-1 text-xs">
-                        {getFileIcon(file)}
-                        <span className="max-w-[150px] truncate">{file.name}</span>
-                        <span className="text-muted-foreground">({formatFileSize(file.size)})</span>
-                        <button
-                          type="button"
-                          onClick={() => removeFile(index)}
-                          className="ml-1 text-muted-foreground hover:text-destructive"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* ドラッグ&ドロップエリア */}
-              <div 
-                ref={dropAreaRef}
-                className="w-full border border-dashed rounded-md p-2 mb-3 text-center text-sm text-muted-foreground transition-colors"
-              >
-                ファイルをドラッグ&ドロップするか、<button type="button" onClick={openFileDialog} className="text-primary hover:underline">ファイルを選択</button>
-                <input 
-                  ref={fileInputRef}
-                  type="file" 
-                  multiple 
-                  className="hidden" 
-                  onChange={handleFileSelect}
-                />
-              </div>
-              
-              <form 
-                onSubmit={handleChatSubmit}
-                className="flex items-center gap-2 w-full"
-              >
-                <Input
-                  value={input}
-                  onChange={handleInputChange}
-                  placeholder="メッセージを入力..."
-                  className="flex-1"
-                  disabled={isLoading || isSubmitting}
-                />
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={openFileDialog}
-                  disabled={isLoading || isSubmitting}
-                  title="ファイルを添付"
-                >
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={isLoading || isSubmitting || (!input.trim() && files.length === 0)}
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  送信
-                </Button>
-              </form>
-            </CardFooter>
-          </Card>
-        </div>
-        
-        {/* ログ情報入力エリア */}
-        <Card>
-          <CardHeader>
-            <h2 className="font-medium">ログ情報</h2>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
+      <div className="md:col-span-2 space-y-6">
+        {/* チャット履歴表示エリア */}
+        <Card className="h-[500px] flex flex-col">
+          <CardHeader className="pb-2">
+            <h2 className="font-medium">対話履歴</h2>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <label htmlFor="log-title" className="block text-sm font-medium mb-1">
-                ログタイトル <span className="text-red-500">*</span>
-              </label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="log-title"
-                  type="text"
-                  value={logTitle}
-                  onChange={(e) => setLogTitle(e.target.value)}
-                  placeholder="例: デザインコンセプト決定"
-                  disabled={isSubmitting}
-                  className="flex-1"
-                />
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={generateTitle}
-                        disabled={messages.length < 2 || isSubmitting}
-                      >
-                        <Brain className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>AIでタイトルを生成</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+          <CardContent ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-4 pb-0">
+            {messages.map(message => (
+              <div 
+                key={message.id}
+                className={`p-3 rounded-lg ${
+                  message.role === 'user' 
+                    ? 'bg-primary/10 ml-12' 
+                    : 'bg-muted/50 mr-12 border'
+                }`}
+              >
+                <div className="font-medium mb-1 text-sm">
+                  {message.role === 'user' ? 'あなた' : 'AI'}
+                </div>
+                <div className="whitespace-pre-wrap text-sm">
+                  {typeof message.content === 'string' 
+                    ? message.content
+                    : message.parts?.map((part, i) => 
+                        part.type === 'text' ? <span key={`${message.id}-part-${i}`}>{part.text}</span> : null
+                      )
+                  }
+                </div>
               </div>
-            </div>
+            ))}
             
-            <div>
-              <label htmlFor="tag-input" className="block text-sm font-medium mb-1">
-                タグ
-              </label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="tag-input"
-                  type="text"
-                  value={currentTag}
-                  onChange={(e) => setCurrentTag(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                  placeholder="タグを入力..."
-                  disabled={isSubmitting}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addTag}
-                  disabled={!currentTag.trim() || isSubmitting}
-                >
-                  <Tag className="h-4 w-4" />
-                </Button>
-                
-                {allUsedTags.length > 0 && (
-                  <Sheet>
-                    <SheetTrigger asChild>
-                      <Button variant="ghost" size="sm" className="px-2">
-                        <Tag className="h-3.5 w-3.5 mr-1" />
-                        過去のタグ
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                      <SheetHeader>
-                        <SheetTitle>過去に使用したタグ</SheetTitle>
-                        <SheetDescription>
-                          クリックして追加します
-                        </SheetDescription>
-                      </SheetHeader>
-                      <div className="flex flex-wrap gap-2 mt-6">
-                        {allUsedTags.map(tag => (
-                          <Badge 
-                            key={tag}
-                            variant="outline"
-                            className="cursor-pointer hover:bg-primary/10"
-                            onClick={() => {
-                              selectExistingTag(tag);
-                            }}
-                          >
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                      <SheetFooter className="mt-6">
-                        <SheetClose asChild>
-                          <Button variant="outline">閉じる</Button>
-                        </SheetClose>
-                      </SheetFooter>
-                    </SheetContent>
-                  </Sheet>
-                )}
+            {isLoading && (
+              <div className="p-3 rounded-lg bg-muted/50 mr-12 border">
+                <div className="font-medium mb-1 text-sm">AI</div>
+                <div className="animate-pulse text-sm">入力中...</div>
               </div>
-              
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {tags.map(tag => (
-                    <Badge 
-                      key={tag}
-                      variant="secondary"
-                      className="flex items-center gap-1 px-2 py-1"
-                    >
-                      {tag}
+            )}
+          </CardContent>
+          <CardFooter className="pt-4 border-t mt-auto flex-col">
+            {/* ファイル一覧 */}
+            {files.length > 0 && (
+              <div className="w-full mb-3 p-2 border rounded-md bg-muted/20">
+                <div className="text-xs font-medium mb-1">添付ファイル:</div>
+                <div className="flex flex-wrap gap-2">
+                  {files.map((file, index) => (
+                    <div key={`${file.name}-${file.lastModified}`} className="flex items-center gap-1 bg-muted/50 rounded px-2 py-1 text-xs">
+                      {getFileIcon(file)}
+                      <span className="max-w-[150px] truncate">{file.name}</span>
+                      <span className="text-muted-foreground">({formatFileSize(file.size)})</span>
                       <button
                         type="button"
-                        onClick={() => removeTag(tag)}
-                        className="ml-1 rounded-full hover:bg-muted p-0.5"
-                        disabled={isSubmitting}
+                        onClick={() => removeFile(index)}
+                        className="ml-1 text-muted-foreground hover:text-destructive"
                       >
                         <X className="h-3 w-3" />
                       </button>
-                    </Badge>
+                    </div>
                   ))}
                 </div>
-              )}
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col border-t pt-4">
-            <Button
-              onClick={saveLog}
-              className="w-full"
-              disabled={isSubmitting || !logTitle || messages.length < 2}
-            >
-              {isSubmitting ? '保存中...' : 'ログを保存'}
-            </Button>
+              </div>
+            )}
             
-            <p className="text-xs text-muted-foreground mt-4">
-              * は必須項目です。AIとの対話を通して制作プロセスを記録することで、振り返りや報告書作成が効率化されます。
-            </p>
+            {/* ドラッグ&ドロップエリア */}
+            <div 
+              ref={dropAreaRef}
+              className="w-full border border-dashed rounded-md p-2 mb-3 text-center text-sm text-muted-foreground transition-colors"
+            >
+              ファイルをドラッグ&ドロップするか、<button type="button" onClick={openFileDialog} className="text-primary hover:underline">ファイルを選択</button>
+              <input 
+                ref={fileInputRef}
+                type="file" 
+                multiple 
+                className="hidden" 
+                onChange={handleFileSelect}
+              />
+            </div>
+            
+            <form 
+              onSubmit={handleChatSubmit}
+              className="flex items-center gap-2 w-full"
+            >
+              <Input
+                value={input}
+                onChange={handleInputChange}
+                placeholder="メッセージを入力..."
+                className="flex-1"
+                disabled={isLoading || isSubmitting}
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                onClick={openFileDialog}
+                disabled={isLoading || isSubmitting}
+                title="ファイルを添付"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isLoading || isSubmitting || (!input.trim() && files.length === 0)}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                送信
+              </Button>
+            </form>
           </CardFooter>
         </Card>
       </div>
+      
+      {/* ログ情報入力エリア */}
+      <Card>
+        <CardHeader>
+          <h2 className="font-medium">ログ情報</h2>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <label htmlFor="log-title" className="block text-sm font-medium mb-1">
+              ログタイトル <span className="text-red-500">*</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="log-title"
+                type="text"
+                value={logTitle}
+                onChange={(e) => setLogTitle(e.target.value)}
+                placeholder="例: デザインコンセプト決定"
+                disabled={isSubmitting}
+                className="flex-1"
+              />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={generateTitle}
+                      disabled={messages.length < 2 || isSubmitting}
+                    >
+                      <Brain className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>AIでタイトルを生成</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+          
+          <div>
+            <label htmlFor="tag-input" className="block text-sm font-medium mb-1">
+              タグ
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="tag-input"
+                type="text"
+                value={currentTag}
+                onChange={(e) => setCurrentTag(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+                placeholder="タグを入力..."
+                disabled={isSubmitting}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addTag}
+                disabled={!currentTag.trim() || isSubmitting}
+              >
+                <Tag className="h-4 w-4" />
+              </Button>
+              
+              {allUsedTags.length > 0 && (
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="ghost" size="sm" className="px-2">
+                      <Tag className="h-3.5 w-3.5 mr-1" />
+                      過去のタグ
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                    <SheetHeader>
+                      <SheetTitle>過去に使用したタグ</SheetTitle>
+                      <SheetDescription>
+                        クリックして追加します
+                      </SheetDescription>
+                    </SheetHeader>
+                    <div className="flex flex-wrap gap-2 mt-6">
+                      {allUsedTags.map(tag => (
+                        <Badge 
+                          key={tag}
+                          variant="outline"
+                          className="cursor-pointer hover:bg-primary/10"
+                          onClick={() => {
+                            selectExistingTag(tag);
+                          }}
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                    <SheetFooter className="mt-6">
+                      <SheetClose asChild>
+                        <Button variant="outline">閉じる</Button>
+                      </SheetClose>
+                    </SheetFooter>
+                  </SheetContent>
+                </Sheet>
+              )}
+            </div>
+            
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {tags.map(tag => (
+                  <Badge 
+                    key={tag}
+                    variant="secondary"
+                    className="flex items-center gap-1 px-2 py-1"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      className="ml-1 rounded-full hover:bg-muted p-0.5"
+                      disabled={isSubmitting}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+        <CardFooter className="flex flex-col border-t pt-4">
+          <Button
+            onClick={saveLog}
+            className="w-full"
+            disabled={isSubmitting || !logTitle || messages.length < 2}
+          >
+            {isSubmitting ? '保存中...' : 'ログを保存'}
+          </Button>
+          
+          <p className="text-xs text-muted-foreground mt-4">
+            * は必須項目です。AIとの対話を通して制作プロセスを記録することで、振り返りや報告書作成が効率化されます。
+          </p>
+        </CardFooter>
+      </Card>
     </div>
   );
 } 

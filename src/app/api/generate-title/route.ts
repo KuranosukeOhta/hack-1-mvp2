@@ -1,3 +1,5 @@
+import { OpenAI } from 'openai';
+
 // サーバーの最大実行時間を30秒に設定
 export const maxDuration = 30;
 
@@ -14,36 +16,25 @@ export async function POST(req: Request) {
       デザインプロセスや作業内容が分かるタイトルが望ましいです。
     `;
     
-    // OpenAI APIを使用してタイトルを生成
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...messages,
-          { role: 'user', content: 'この会話の内容を表す、簡潔なタイトルを30文字以内で生成してください。タイトルのみを返してください。' }
-        ],
-        max_tokens: 50,
-        temperature: 0.7,
-      })
+    // OpenAI APIを直接使用してタイトル生成
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
     });
     
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    // 生成されたタイトルを取得
-    const title = data.choices[0]?.message?.content?.trim() || '新規ログ';
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages,
+        { role: 'user', content: 'この会話の内容を表す、簡潔なタイトルを30文字以内で生成してください。タイトルのみを返してください。' }
+      ],
+      temperature: 0.7,
+      max_tokens: 50,
+    });
     
     // レスポンスを返す
-    return Response.json({ title });
+    const title = response.choices[0]?.message?.content || '新規ログ';
+    return Response.json({ title: title.trim() });
   } catch (error) {
     console.error('Error in title generation API:', error);
     return new Response(
