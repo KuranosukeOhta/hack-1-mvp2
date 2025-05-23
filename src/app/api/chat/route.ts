@@ -48,7 +48,7 @@ export async function POST(req: Request) {
               description: 'ファイルのMIMEタイプ',
             },
           },
-          execute: async ({ fileContent, fileName, fileType }) => {
+          execute: async ({ fileName, fileType }) => {
             // ここでファイル処理のロジックを実装
             return {
               processedContent: `ファイル名: ${fileName}、種類: ${fileType}を処理しました。`,

@@ -20,7 +20,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import Link from 'next/link';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ローカルストレージのキー
 const LS_PROJECTS_KEY = 'design-log-projects';
@@ -63,6 +62,14 @@ export default function NewLogPage() {
   
   // メッセージが更新されたときに自動スクロール
   useLayoutEffect(() => {
+    if (chatContainerRef.current) {
+      const container = chatContainerRef.current;
+      container.scrollTop = container.scrollHeight;
+    }
+  }, []);
+
+  // 別のuseEffectでメッセージの変更を監視
+  useEffect(() => {
     if (chatContainerRef.current) {
       const container = chatContainerRef.current;
       container.scrollTop = container.scrollHeight;

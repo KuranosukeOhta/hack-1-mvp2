@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
-  CalendarIcon, ClockIcon, FolderIcon, UsersIcon, 
-  PlusCircle, BarChart2Icon, FileTextIcon, 
-  BrainIcon, ActivityIcon, CheckIcon, XIcon, TagIcon, AlignLeftIcon
+  CalendarIcon, PlusCircle, FileTextIcon, 
+  CheckIcon, XIcon, TagIcon, AlignLeftIcon, UsersIcon
 } from 'lucide-react';
 import {
   Dialog,
@@ -146,8 +145,6 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [isNewLogDialogOpen, setIsNewLogDialogOpen] = useState(false);
-  const [editMode, setEditMode] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<{[key: string]: string}>({});
   const [showToast, setShowToast] = useState(false);
   
   const loadProject = useCallback(() => {
@@ -219,7 +216,7 @@ export default function ProjectDetailPage() {
     }
   }, [params.id]);
   
-  const saveProjectField = (field: string, value: string) => {
+  const saveProjectField = (field: string, value: string, setIsEditingCallback?: (editing: boolean) => void) => {
     if (!project) return;
     
     try {
@@ -244,34 +241,27 @@ export default function ProjectDetailPage() {
             
             setProject(projects[projectIndex]);
             
+            if (setIsEditingCallback) {
+              setIsEditingCallback(false);
+            }
+            
             setShowToast(true);
-            setTimeout(() => setShowToast(false), 3000);
+            const timer = setTimeout(() => {
+              setShowToast(false);
+            }, 3000);
+            
+            return () => clearTimeout(timer);
           }
         }
       }
     } catch (error) {
       console.error('プロジェクトの保存に失敗しました:', error);
       alert('プロジェクトの保存に失敗しました');
+      
+      if (setIsEditingCallback) {
+        setIsEditingCallback(true);
+      }
     }
-    
-    setEditMode(null);
-  };
-  
-  const startEdit = (field: string, initialValue: string | string[] | undefined) => {
-    let value = '';
-    
-    if (Array.isArray(initialValue)) {
-      value = initialValue.join(', ');
-    } else if (initialValue !== undefined) {
-      value = initialValue;
-    }
-    
-    setEditValues({ ...editValues, [field]: value });
-    setEditMode(field);
-  };
-  
-  const cancelEdit = () => {
-    setEditMode(null);
   };
   
   const EditableField = ({ 
@@ -279,46 +269,114 @@ export default function ProjectDetailPage() {
     value, 
     label, 
     icon: Icon,
-    type = 'text'
+    type = 'text',
+    onSave
   }: { 
     field: string; 
     value: string | string[] | undefined; 
     label: string; 
-    icon: any;
+    icon: React.ElementType;
     type?: 'text' | 'date';
+    onSave: (field: string, value: string, setIsEditing?: (editing: boolean) => void) => void;
   }) => {
-    const isEditing = editMode === field;
+    const [isEditing, setIsEditing] = useState(false);
+    const [localValue, setLocalValue] = useState('');
+    const [isComposing, setIsComposing] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // 表示用の値を取得
     const displayValue = Array.isArray(value) ? value.join(', ') : (value || '');
+
+    // 編集開始時の処理
+    const handleStartEdit = () => {
+      setIsEditing(true);
+      setLocalValue(displayValue);
+    };
+
+    // キャンセル処理
+    const handleCancel = () => {
+      setIsEditing(false);
+    };
+
+    // 保存処理
+    const handleSave = () => {
+      onSave(field, localValue, setIsEditing);
+    };
     
+    // フォーカスが外れたときの処理
+    const handleBlur = (e: React.FocusEvent) => {
+      // 関連要素（保存・キャンセルボタンなど）へのクリックなら処理しない
+      if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+      
+      // 入力が確定していない場合は処理しない
+      if (isComposing) return;
+      
+      handleSave();
+    };
+    
+    // 編集モードが開始されたら自動フォーカス
+    useEffect(() => {
+      if (isEditing && inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, [isEditing]);
+
+    // キーボードイベントハンドラ
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (!isEditing) {
+          handleStartEdit();
+        }
+      }
+    };
+
     return (
-      <div 
-        className={`flex items-center gap-2 text-sm ${isEditing ? 'bg-primary/5 p-1 rounded' : 'cursor-pointer hover:bg-muted/50 p-1 rounded'}`}
-        onClick={() => !isEditing && startEdit(field, value)}
+      <button 
+        className={`flex items-center gap-2 text-sm w-full text-left ${isEditing ? 'bg-primary/5 p-1 rounded' : 'cursor-pointer hover:bg-muted/50 p-1 rounded'}`}
+        onClick={() => !isEditing && handleStartEdit()}
+        onKeyDown={handleKeyDown}
+        disabled={isEditing}
+        aria-label={`${label}を編集`}
+        type="button"
       >
         <Icon className="h-4 w-4 text-muted-foreground" />
         <span className="text-muted-foreground">{label}:</span>
         
         {isEditing ? (
-          <div className="flex items-center gap-2 flex-1">
+          <div className="flex items-center gap-2 flex-1" onBlur={handleBlur}>
             <input 
+              ref={inputRef}
               type={type}
               className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              value={editValues[field]}
-              onChange={(e) => setEditValues({...editValues, [field]: e.target.value})}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') saveProjectField(field, editValues[field]);
-                if (e.key === 'Escape') cancelEdit();
+              value={localValue}
+              onChange={(e) => setLocalValue(e.target.value)}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={() => {
+                setIsComposing(false);
+                // Safariでの問題対応のため少し遅延
+                setTimeout(() => {
+                  setIsComposing(false);
+                }, 10);
               }}
-              autoFocus
+              onKeyDown={(e) => {
+                if (isComposing) return;
+                
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSave();
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  handleCancel();
+                }
+              }}
             />
             <Button 
               variant="ghost" 
               size="icon"
               className="h-8 w-8"
-              onClick={(e) => {
-                e.stopPropagation();
-                saveProjectField(field, editValues[field]);
-              }}
+              onClick={handleSave}
             >
               <CheckIcon className="h-4 w-4" />
             </Button>
@@ -326,10 +384,7 @@ export default function ProjectDetailPage() {
               variant="ghost" 
               size="icon" 
               className="h-8 w-8"
-              onClick={(e) => {
-                e.stopPropagation();
-                cancelEdit();
-              }}
+              onClick={handleCancel}
             >
               <XIcon className="h-4 w-4" />
             </Button>
@@ -337,7 +392,88 @@ export default function ProjectDetailPage() {
         ) : (
           <span className="flex-1">{displayValue || '未設定'}</span>
         )}
-      </div>
+      </button>
+    );
+  };
+  
+  const EditableDescription = ({ 
+    value, 
+    onSave 
+  }: { 
+    value: string; 
+    onSave: (value: string, setIsEditing?: (editing: boolean) => void) => void;
+  }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [localValue, setLocalValue] = useState(value || '');
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // 編集開始時の処理
+    const handleStartEdit = () => {
+      setIsEditing(true);
+      setLocalValue(value || '');
+    };
+
+    // キーボードイベントハンドラ
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (!isEditing) {
+          handleStartEdit();
+        }
+      }
+    };
+
+    // 編集モードが開始されたら自動フォーカス
+    useEffect(() => {
+      if (isEditing && textareaRef.current) {
+        textareaRef.current.focus();
+      }
+    }, [isEditing]);
+
+    return (
+      <button 
+        className={`w-full text-left ${isEditing ? 'bg-primary/5 p-2 rounded' : 'cursor-pointer hover:bg-muted/50 p-2 rounded'}`} 
+        onClick={() => !isEditing && handleStartEdit()}
+        onKeyDown={handleKeyDown}
+        disabled={isEditing}
+        aria-label="説明を編集"
+        type="button"
+      >
+        <div className="flex items-center gap-2 text-sm mb-1">
+          <AlignLeftIcon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-muted-foreground">説明:</span>
+        </div>
+        
+        {isEditing ? (
+          <div className="flex flex-col gap-2">
+            <textarea
+              ref={textareaRef}
+              className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={localValue}
+              onChange={(e) => setLocalValue(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setIsEditing(false)}
+              >
+                キャンセル
+              </Button>
+              <Button 
+                size="sm"
+                onClick={() => {
+                  onSave(localValue, setIsEditing);
+                }}
+              >
+                保存
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm">{value || '説明なし'}</p>
+        )}
+      </button>
     );
   };
   
@@ -393,6 +529,7 @@ export default function ProjectDetailPage() {
           <>
             <h1 className="text-3xl font-bold mt-4">{project.title}</h1>
             <p className="text-muted-foreground mt-1 max-w-2xl">{project.description}</p>
+            <div className="mt-2">{project.status && getStatusBadge(project.status)}</div>
           </>
         ) : (
           <h1 className="text-3xl font-bold mt-4">プロジェクトが見つかりません</h1>
@@ -431,6 +568,7 @@ export default function ProjectDetailPage() {
                     value={project.title} 
                     label="タイトル" 
                     icon={FileTextIcon}
+                    onSave={saveProjectField}
                   />
                   
                   <EditableField 
@@ -438,6 +576,7 @@ export default function ProjectDetailPage() {
                     value={project.category} 
                     label="カテゴリー" 
                     icon={TagIcon}
+                    onSave={saveProjectField}
                   />
                   
                   <EditableField 
@@ -446,6 +585,7 @@ export default function ProjectDetailPage() {
                     label="作成日" 
                     icon={CalendarIcon}
                     type="date"
+                    onSave={saveProjectField}
                   />
                   
                   <EditableField 
@@ -454,6 +594,7 @@ export default function ProjectDetailPage() {
                     label="期限" 
                     icon={CalendarIcon}
                     type="date"
+                    onSave={saveProjectField}
                   />
                   
                   <EditableField 
@@ -461,54 +602,13 @@ export default function ProjectDetailPage() {
                     value={project.members} 
                     label="メンバー" 
                     icon={UsersIcon}
+                    onSave={saveProjectField}
                   />
                   
-                  <div 
-                    className={`${editMode === 'description' ? 'bg-primary/5 p-2 rounded' : 'cursor-pointer hover:bg-muted/50 p-2 rounded'}`} 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      !editMode && startEdit('description', project.description);
-                    }}
-                  >
-                    <div className="flex items-center gap-2 text-sm mb-1">
-                      <AlignLeftIcon className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">説明:</span>
-                    </div>
-                    
-                    {editMode === 'description' ? (
-                      <div className="flex flex-col gap-2">
-                        <textarea
-                          className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          value={editValues.description}
-                          onChange={(e) => setEditValues({...editValues, description: e.target.value})}
-                          autoFocus
-                        />
-                        <div className="flex justify-end gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              cancelEdit();
-                            }}
-                          >
-                            キャンセル
-                          </Button>
-                          <Button 
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              saveProjectField('description', editValues.description);
-                            }}
-                          >
-                            保存
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm">{project.description || '説明なし'}</p>
-                    )}
-                  </div>
+                  <EditableDescription 
+                    value={project.description} 
+                    onSave={(value, setIsEditing) => saveProjectField('description', value, setIsEditing)} 
+                  />
                   
                   <div className="flex items-center justify-between gap-2 text-sm">
                     <span className="text-muted-foreground">ステータス:</span>

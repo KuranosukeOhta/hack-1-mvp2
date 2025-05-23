@@ -19,12 +19,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 // ローカルストレージのキー
 const LS_PROJECTS_KEY = 'design-log-projects';
@@ -45,7 +39,11 @@ export default function NewLogForm({ projectId, onComplete }: NewLogFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allUsedTags, setAllUsedTags] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
-  const [projectData, setProjectData] = useState<any>(null);
+  const [projectData, setProjectData] = useState<{
+    title?: string;
+    description?: string;
+    category?: string;
+  }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropAreaRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -57,9 +55,13 @@ export default function NewLogForm({ projectId, onComplete }: NewLogFormProps) {
         const storedProjects = localStorage.getItem(LS_PROJECTS_KEY);
         if (storedProjects) {
           const projects = JSON.parse(storedProjects);
-          const project = projects.find((p: any) => p.id === projectId);
+          const project = projects.find((p: { id: string }) => p.id === projectId);
           if (project) {
-            setProjectData(project);
+            setProjectData({
+              title: project.title,
+              description: project.description,
+              category: project.category
+            });
           }
         }
       } catch (error) {
@@ -78,14 +80,14 @@ export default function NewLogForm({ projectId, onComplete }: NewLogFormProps) {
       }
     ],
     api: "/api/chat", 
-    body: projectData ? {
+    body: {
       projectContext: {
         projectId,
-        title: projectData.title,
-        description: projectData.description,
-        category: projectData.category
+        title: projectData.title || '',
+        description: projectData.description || '',
+        category: projectData.category || ''
       }
-    } : { projectId },
+    },
     onError: (error) => {
       console.error("Chat API error:", error);
       alert("チャットAPI接続時にエラーが発生しました");
@@ -121,6 +123,46 @@ export default function NewLogForm({ projectId, onComplete }: NewLogFormProps) {
       }
     }
   }, []);
+
+  // ファイル選択ダイアログを開く
+  const openFileDialog = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // ファイル選択時の処理
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      handleFiles(Array.from(e.target.files));
+    }
+  };
+
+  // ファイル処理共通関数
+  const handleFiles = (selectedFiles: File[]) => {
+    // 既存のファイルと新しいファイルを結合
+    setFiles(prevFiles => [...prevFiles, ...selectedFiles]);
+    
+    // ファイルを処理
+    for (const file of selectedFiles) {
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        const result = e.target?.result;
+        if (typeof result === 'string' && result) {
+          // ここにファイル処理のロジックを追加
+          console.log(`ファイル ${file.name} を読み込みました`);
+        }
+      };
+      
+      // テキストファイルとして読み込む
+      if (file.type.startsWith('text/') || file.type === 'application/json') {
+        reader.readAsText(file);
+      } else {
+        reader.readAsDataURL(file);
+      }
+    }
+  };
 
   // ドラッグ&ドロップのイベントハンドラ設定
   useEffect(() => {
@@ -170,59 +212,6 @@ export default function NewLogForm({ projectId, onComplete }: NewLogFormProps) {
       document.removeEventListener('paste', handlePaste);
     };
   }, []);
-
-  // ファイル選択ダイアログを開く
-  const openFileDialog = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  // ファイル選択時の処理
-  const handleFiles = (selectedFiles: File[]) => {
-    // 既存のファイルと新しいファイルを結合
-    setFiles(prevFiles => [...prevFiles, ...selectedFiles]);
-    
-    // ファイルを処理
-    selectedFiles.forEach(file => {
-      const reader = new FileReader();
-      
-      reader.onload = async (e) => {
-        const result = e.target?.result;
-        if (typeof result === 'string' && result) {
-          // テキストファイルの場合は内容を追加
-          if (file.type.startsWith('text/') || file.type === 'application/json') {
-            const fileContent = `添付ファイル「${file.name}」の内容:\n${result.substring(0, 1000)}${result.length > 1000 ? '...(省略)' : ''}`;
-            
-            // 入力フィールドに追加
-            const inputElement = document.querySelector('input[name="input"]') as HTMLInputElement;
-            if (inputElement) {
-              inputElement.value = `${input}\n\n${fileContent}`;
-              const event = new Event('input', { bubbles: true });
-              inputElement.dispatchEvent(event);
-            }
-          } else {
-            // その他のファイル形式の場合は名前と種類だけを通知
-            const fileInfo = `添付ファイル: ${file.name} (${file.type}, ${formatFileSize(file.size)})`;
-            
-            // 入力フィールドに追加
-            const inputElement = document.querySelector('input[name="input"]') as HTMLInputElement;
-            if (inputElement) {
-              inputElement.value = `${input}\n\n${fileInfo}`;
-              const event = new Event('input', { bubbles: true });
-              inputElement.dispatchEvent(event);
-            }
-          }
-        }
-      };
-      
-      if (file.type.startsWith('text/') || file.type === 'application/json') {
-        reader.readAsText(file);
-      } else {
-        reader.readAsDataURL(file);
-      }
-    });
-  };
 
   // ファイルの種類に応じたアイコンを返す
   const getFileIcon = (file: File) => {
