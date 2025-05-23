@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { 
   CalendarIcon, ClockIcon, FolderIcon, UsersIcon, 
   PlusCircle, BarChart2Icon, FileTextIcon, 
-  BrainIcon, ActivityIcon 
+  BrainIcon, ActivityIcon, CheckIcon, XIcon, TagIcon, AlignLeftIcon
 } from 'lucide-react';
 import {
   Dialog,
@@ -146,58 +146,42 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [isNewLogDialogOpen, setIsNewLogDialogOpen] = useState(false);
+  const [editMode, setEditMode] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<{[key: string]: string}>({});
+  const [showToast, setShowToast] = useState(false);
   
-  useEffect(() => {
-    const loadProject = () => {
-      try {
-        // ブラウザ環境でのみ実行
-        if (typeof window === 'undefined') {
-          setLoading(false);
-          return;
-        }
+  const loadProject = useCallback(() => {
+    try {
+      if (typeof window === 'undefined') {
+        setLoading(false);
+        return;
+      }
+      
+      const storedProjects = localStorage.getItem(LS_PROJECTS_KEY);
+      if (storedProjects) {
+        const projects = JSON.parse(storedProjects) as Project[];
+        const projectId = params.id as string;
+        const foundProject = projects.find(p => p.id === projectId);
         
-        // プロジェクト一覧を読み込む
-        const storedProjects = localStorage.getItem(LS_PROJECTS_KEY);
-        if (storedProjects) {
-          const projects = JSON.parse(storedProjects) as Project[];
-          const projectId = params.id as string;
-          const foundProject = projects.find(p => p.id === projectId);
+        if (foundProject) {
+          const normalizedProject: Project = {
+            ...foundProject,
+            logs: foundProject.logs || [],
+            members: foundProject.members || [],
+            status: foundProject.status || 'planning',
+            deadline: foundProject.deadline || undefined
+          };
           
-          if (foundProject) {
-            // データの正規化（欠けているプロパティをデフォルト値で埋める）
-            const normalizedProject: Project = {
-              ...foundProject,
-              logs: foundProject.logs || [],
-              members: foundProject.members || [],
-              status: foundProject.status || 'planning',
-              deadline: foundProject.deadline || undefined
-            };
-            
-            // プロジェクトに紐づくログを読み込む
-            const logsKey = `${LS_LOGS_PREFIX}${projectId}`;
-            const storedLogs = localStorage.getItem(logsKey);
-            
-            if (storedLogs) {
-              normalizedProject.logs = JSON.parse(storedLogs);
-            }
-            
-            setProject(normalizedProject);
-          } else {
-            // LocalStorageにない場合はサンプルデータから探す
-            const sampleProject = sampleProjectsData[projectId as string];
-            if (sampleProject) {
-              setProject({
-                ...sampleProject,
-                logs: sampleProject.logs || []
-              });
-            } else {
-              setProject(null);
-            }
+          const logsKey = `${LS_LOGS_PREFIX}${projectId}`;
+          const storedLogs = localStorage.getItem(logsKey);
+          
+          if (storedLogs) {
+            normalizedProject.logs = JSON.parse(storedLogs);
           }
+          
+          setProject(normalizedProject);
         } else {
-          // 初回アクセス時はサンプルデータをLocalStorageに保存
-          localStorage.setItem(LS_PROJECTS_KEY, JSON.stringify(Object.values(sampleProjectsData)));
-          const sampleProject = sampleProjectsData[params.id as string];
+          const sampleProject = sampleProjectsData[projectId as string];
           if (sampleProject) {
             setProject({
               ...sampleProject,
@@ -207,8 +191,8 @@ export default function ProjectDetailPage() {
             setProject(null);
           }
         }
-      } catch (error) {
-        console.error('プロジェクトデータの読み込みに失敗しました:', error);
+      } else {
+        localStorage.setItem(LS_PROJECTS_KEY, JSON.stringify(Object.values(sampleProjectsData)));
         const sampleProject = sampleProjectsData[params.id as string];
         if (sampleProject) {
           setProject({
@@ -218,13 +202,148 @@ export default function ProjectDetailPage() {
         } else {
           setProject(null);
         }
-      } finally {
-        setLoading(false);
       }
-    };
-    
-    loadProject();
+    } catch (error) {
+      console.error('プロジェクトデータの読み込みに失敗しました:', error);
+      const sampleProject = sampleProjectsData[params.id as string];
+      if (sampleProject) {
+        setProject({
+          ...sampleProject,
+          logs: sampleProject.logs || []
+        });
+      } else {
+        setProject(null);
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [params.id]);
+  
+  const saveProjectField = (field: string, value: string) => {
+    if (!project) return;
+    
+    try {
+      const updatedProject = { ...project, [field]: value };
+      
+      if (field === 'members') {
+        updatedProject.members = value.split(',').map(m => m.trim()).filter(Boolean);
+      }
+      
+      if (typeof window !== 'undefined') {
+        const storedProjects = localStorage.getItem(LS_PROJECTS_KEY);
+        if (storedProjects) {
+          const projects = JSON.parse(storedProjects);
+          const projectIndex = projects.findIndex((p: { id: string }) => p.id === project.id);
+          
+          if (projectIndex >= 0) {
+            projects[projectIndex] = { 
+              ...updatedProject,
+              updatedAt: new Date().toISOString().split('T')[0]
+            };
+            localStorage.setItem(LS_PROJECTS_KEY, JSON.stringify(projects));
+            
+            setProject(projects[projectIndex]);
+            
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('プロジェクトの保存に失敗しました:', error);
+      alert('プロジェクトの保存に失敗しました');
+    }
+    
+    setEditMode(null);
+  };
+  
+  const startEdit = (field: string, initialValue: string | string[] | undefined) => {
+    let value = '';
+    
+    if (Array.isArray(initialValue)) {
+      value = initialValue.join(', ');
+    } else if (initialValue !== undefined) {
+      value = initialValue;
+    }
+    
+    setEditValues({ ...editValues, [field]: value });
+    setEditMode(field);
+  };
+  
+  const cancelEdit = () => {
+    setEditMode(null);
+  };
+  
+  const EditableField = ({ 
+    field, 
+    value, 
+    label, 
+    icon: Icon,
+    type = 'text'
+  }: { 
+    field: string; 
+    value: string | string[] | undefined; 
+    label: string; 
+    icon: any;
+    type?: 'text' | 'date';
+  }) => {
+    const isEditing = editMode === field;
+    const displayValue = Array.isArray(value) ? value.join(', ') : (value || '');
+    
+    return (
+      <div 
+        className={`flex items-center gap-2 text-sm ${isEditing ? 'bg-primary/5 p-1 rounded' : 'cursor-pointer hover:bg-muted/50 p-1 rounded'}`}
+        onClick={() => !isEditing && startEdit(field, value)}
+      >
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <span className="text-muted-foreground">{label}:</span>
+        
+        {isEditing ? (
+          <div className="flex items-center gap-2 flex-1">
+            <input 
+              type={type}
+              className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={editValues[field]}
+              onChange={(e) => setEditValues({...editValues, [field]: e.target.value})}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveProjectField(field, editValues[field]);
+                if (e.key === 'Escape') cancelEdit();
+              }}
+              autoFocus
+            />
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="h-8 w-8"
+              onClick={(e) => {
+                e.stopPropagation();
+                saveProjectField(field, editValues[field]);
+              }}
+            >
+              <CheckIcon className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8"
+              onClick={(e) => {
+                e.stopPropagation();
+                cancelEdit();
+              }}
+            >
+              <XIcon className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <span className="flex-1">{displayValue || '未設定'}</span>
+        )}
+      </div>
+    );
+  };
+  
+  useEffect(() => {
+    loadProject();
+  }, [loadProject]);
   
   const getStatusBadge = (status: Project['status']) => {
     switch (status) {
@@ -280,6 +399,13 @@ export default function ProjectDetailPage() {
         )}
       </header>
       
+      {showToast && (
+        <div className="fixed top-4 right-4 bg-green-100 border border-green-200 text-green-800 px-4 py-2 rounded shadow-md z-50 flex items-center gap-2">
+          <CheckIcon className="h-4 w-4" />
+          保存しました！
+        </div>
+      )}
+      
       {loading ? (
         <div className="grid gap-6">
           {[1, 2, 3].map(i => (
@@ -289,44 +415,113 @@ export default function ProjectDetailPage() {
       ) : project ? (
         <>
           <div className="flex flex-wrap gap-4 mb-8">
-            {/* プロジェクト情報カード */}
             <Card className="flex-1 min-w-[300px]">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">プロジェクト情報</CardTitle>
+                <CardTitle className="text-lg flex justify-between items-center">
+                  プロジェクト情報
+                  <div className="text-sm text-muted-foreground font-normal">
+                    項目をクリックして編集
+                  </div>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-primary/5 text-primary">
-                      {project.category}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">作成日:</span>
-                    <span>{project.createdAt}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <ClockIcon className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">更新日:</span>
-                    <span>{project.updatedAt}</span>
-                  </div>
-                  {project.deadline && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">期限:</span>
-                      <span>{project.deadline}</span>
+                <div className="grid grid-cols-1 gap-4">
+                  <EditableField 
+                    field="title" 
+                    value={project.title} 
+                    label="タイトル" 
+                    icon={FileTextIcon}
+                  />
+                  
+                  <EditableField 
+                    field="category" 
+                    value={project.category} 
+                    label="カテゴリー" 
+                    icon={TagIcon}
+                  />
+                  
+                  <EditableField 
+                    field="createdAt" 
+                    value={project.createdAt} 
+                    label="作成日" 
+                    icon={CalendarIcon}
+                    type="date"
+                  />
+                  
+                  <EditableField 
+                    field="deadline" 
+                    value={project.deadline} 
+                    label="期限" 
+                    icon={CalendarIcon}
+                    type="date"
+                  />
+                  
+                  <EditableField 
+                    field="members" 
+                    value={project.members} 
+                    label="メンバー" 
+                    icon={UsersIcon}
+                  />
+                  
+                  <div 
+                    className={`${editMode === 'description' ? 'bg-primary/5 p-2 rounded' : 'cursor-pointer hover:bg-muted/50 p-2 rounded'}`} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      !editMode && startEdit('description', project.description);
+                    }}
+                  >
+                    <div className="flex items-center gap-2 text-sm mb-1">
+                      <AlignLeftIcon className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">説明:</span>
                     </div>
-                  )}
-                  {project.members && project.members.length > 0 && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <UsersIcon className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">メンバー:</span>
-                      <span>{project.members.join(', ')}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(project.status)}
+                    
+                    {editMode === 'description' ? (
+                      <div className="flex flex-col gap-2">
+                        <textarea
+                          className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          value={editValues.description}
+                          onChange={(e) => setEditValues({...editValues, description: e.target.value})}
+                          autoFocus
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              cancelEdit();
+                            }}
+                          >
+                            キャンセル
+                          </Button>
+                          <Button 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              saveProjectField('description', editValues.description);
+                            }}
+                          >
+                            保存
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm">{project.description || '説明なし'}</p>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className="text-muted-foreground">ステータス:</span>
+                    <select 
+                      className="h-8 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      value={project.status}
+                      onChange={(e) => saveProjectField('status', e.target.value)}
+                    >
+                      <option value="planning">計画中</option>
+                      <option value="in-progress">進行中</option>
+                      <option value="review">レビュー中</option>
+                      <option value="completed">完了</option>
+                    </select>
                   </div>
                 </div>
               </CardContent>
@@ -354,7 +549,6 @@ export default function ProjectDetailPage() {
             </Dialog>
           </div>
           
-          {/* ログ一覧 */}
           <div className="space-y-4">
             {project.logs && project.logs.length > 0 ? (
               project.logs

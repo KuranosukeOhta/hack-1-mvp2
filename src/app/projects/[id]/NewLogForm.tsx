@@ -45,21 +45,47 @@ export default function NewLogForm({ projectId, onComplete }: NewLogFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allUsedTags, setAllUsedTags] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
+  const [projectData, setProjectData] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropAreaRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   
+  // プロジェクトデータをローカルストレージから取得
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const storedProjects = localStorage.getItem(LS_PROJECTS_KEY);
+        if (storedProjects) {
+          const projects = JSON.parse(storedProjects);
+          const project = projects.find((p: any) => p.id === projectId);
+          if (project) {
+            setProjectData(project);
+          }
+        }
+      } catch (error) {
+        console.error('プロジェクト情報の取得に失敗しました:', error);
+      }
+    }
+  }, [projectId]);
+  
   // AIチャットの初期化（AI SDKを使用）
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: "/api/chat",
-    body: {
+    initialMessages: [
+      {
+        id: 'initial',
+        role: 'assistant',
+        content: 'こんにちは！このプロジェクトについて、どのようなことを記録しましょうか？',
+      }
+    ],
+    api: "/api/chat", 
+    body: projectData ? {
       projectContext: {
         projectId,
-        title: projectTitle,
-        description: projectDescription,
-        category: projectCategory
+        title: projectData.title,
+        description: projectData.description,
+        category: projectData.category
       }
-    },
+    } : { projectId },
     onError: (error) => {
       console.error("Chat API error:", error);
       alert("チャットAPI接続時にエラーが発生しました");
